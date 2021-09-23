@@ -50,7 +50,7 @@ module X11
       auth_info = Auth.new.get_by_hostname(host||"localhost", family, display_id)
       auth_name, auth_data = auth_info.address, auth_info.auth_data
 
-      handshake = Packet::ClientHandshake.create(
+      handshake = Form::ClientHandshake.new(
         Protocol::BYTE_ORDER,
         Protocol::MAJOR,
         Protocol::MINOR,
@@ -58,9 +58,12 @@ module X11
         auth_data
       )
 
-      @socket.write(handshake)
+      @socket.write(handshake.to_packet)
 
-      case @socket.read(1).unpack("w").first
+      data = @socket.read(1)
+      raise AuthorizationError, "Failed to read response from server" if !data
+
+      case data.unpack("w").first
       when X11::Auth::FAILED
         len, major, minor, xlen = @socket.read(7).unpack("CSSS")
         reason = @socket.read(xlen * 4)
@@ -70,7 +73,7 @@ module X11
         raise AuthorizationError, "Connection requires authentication"
       when X11::Auth::SUCCESS
         @socket.read(7) # skip unused bytes
-        @internal = Packet::DisplayInfo.read(@socket)
+        @internal = Form::DisplayInfo.from_packet(@socket)
       else
         raise AuthorizationError, "Received unknown opcode #{type}"
       end
