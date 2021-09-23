@@ -38,8 +38,8 @@ module X11
 
         packet = structs.map do |s|
           # fetch value of field set in initialization
-          value = instance_variable_get("@#{s.name}")
 
+          value = s.type == :unused ? nil : instance_variable_get("@#{s.name}")
           case s.type
           when :field
             if value.is_a?(BaseForm)
