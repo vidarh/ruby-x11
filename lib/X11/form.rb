@@ -1,3 +1,5 @@
+require 'ostruct'
+
 module X11
   module Form
     # A form object is an X11 packet definition. We use forms to encode
