@@ -1,9 +1,9 @@
-source "http://rubygems.org"
+source "https://rubygems.org"
 
 gemspec
 
 gem 'rake'
-gem 'active_support'
+gem 'activesupport'
 
 group :development do
   gem "hexdump"
