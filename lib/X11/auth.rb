@@ -27,7 +27,7 @@ module X11
     # The filename will be taken from the XAUTHORITY environment variable,
     # if present, or '.Xauthority' in the user's home directory, or it may be overridden
     # by an argument.
-    def initialize(path = ENV['XAUTHORITY'] || ENV['HOME'] + "/Xauthority")
+    def initialize(path = ENV['XAUTHORITY'] || ENV['HOME'] + "/.Xauthority")
       @file = File.open(path)
     end
 
@@ -35,7 +35,7 @@ module X11
     # If family is 'Internet', the host will be translated into an appropriate address by gethostbyname().
     # If no data is found, returns nil
     def get_by_hostname(host, family, display_id)
-      host = `hostname`.chomp if host == 'localhost' or host == '127.0.0.1'
+      host = `hostname`.chomp if host == 'localhost' or host == '127.0.0.1' or host.nil?
       address = TCPSocket.gethostbyname(host) if family == :Internet # this line does nothing for now
 
       auth_data = nil
