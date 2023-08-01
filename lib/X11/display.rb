@@ -27,6 +27,8 @@ module X11
       end
 
       authorize(host, family, display_id)
+      @requestseq = 1
+      @queue = []
     end
 
     def screens
@@ -48,11 +50,105 @@ module X11
       (id & @internal.resource_id_mask) | @internal.resource_id_base
     end
 
+    def read_error data
+      error = Form::Error.from_packet(StringIO.new(data))
+      STDERR.puts "ERROR: #{error.inspect}"
+      error
+    end
+
+    def read_reply data
+      len = data.unpack("@4L")[0]
+      extra = len > 0 ? @socket.read(len*4) : ""
+      #STDERR.puts "REPLY: #{data.inspect}"
+      #STDERR.puts "EXTRA: #{extra.inspect}"
+      data + extra
+    end
+
+    def read_event type, data, event_class
+      case type
+      when 12
+        return Form::Expose.from_packet(StringIO.new(data))
+      when 19
+        return Form::MapNotify.from_packet(StringIO.new(data))
+      when 22
+        return Form::ConfigureNotify.from_packet(StringIO.new(data))
+      else
+        STDERR.puts "FIXME: Event: #{type}"
+        STDERR.puts "EVENT: #{data.inspect}"
+      end
+    end
+
+    def read_full_packet(len = 32)
+      data = @socket.read_nonblock(32)
+      return nil if data.nil?
+      while data.length < 32
+        IO.select([@socket],nil,nil,0.001)
+        data.concat(@socket.read_nonblock(32 - data.length))
+      end
+      return data
+    rescue IO::WaitReadable
+      return nil
+    end
+
+    def read_packet timeout=5.0
+      IO.select([@socket],nil,nil, timeout)
+      data = read_full_packet(32)
+      return nil if data.nil?
+
+      type = data.unpack("C").first
+      case type
+      when 0
+        read_error(data)
+      when 1
+        read_reply(data)
+      when 2..34
+        read_event(type, data, nil)
+      else
+        raise ProtocolError, "Unsupported reply type: #{type}"
+      end
+    end
+
+    def write_request data
+      p data
+      data = data.to_packet if data.respond_to?(:to_packet)
+      @socket.write(data)
+    end
+
+    def write_sync(data, reply=nil)
+      write_request(data)
+      pkt = next_reply
+      return nil if !pkt
+      reply ? reply.from_packet(StringIO.new(pkt)) : pkt
+    end
+
+    def next_packet
+      @queue.shift || read_packet
+    end
+
+    def next_reply
+      while pkt = next_packet
+        if pkt.is_a?(String)
+          return pkt
+        else
+          @queue.push(pkt)
+        end
+      end
+    end
+
+    def run
+      loop do
+        pkt = read_packet
+        return if !pkt
+        yield(pkt)
+      end
+    end
+        
     private
 
     def authorize(host, family, display_id)
       auth = Auth.new
       auth_info = auth.get_by_hostname(host||"localhost", family, display_id)
+
       auth_name, auth_data = auth_info.address, auth_info.auth_data
 
       handshake = Form::ClientHandshake.new(
