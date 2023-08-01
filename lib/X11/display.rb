@@ -1,8 +1,12 @@
+# FIXME: Temp workaround
+require 'stringio'
+
 module X11
 
   class DisplayError < X11Error; end
   class ConnectionError < X11Error; end
   class AuthorizationError < X11Error; end
+  class ProtocolError < X11Error; end
 
   class Display
     attr_accessor :socket
@@ -47,7 +51,8 @@ module X11
     private
 
     def authorize(host, family, display_id)
-      auth_info = Auth.new.get_by_hostname(host||"localhost", family, display_id)
+      auth = Auth.new
+      auth_info = auth.get_by_hostname(host||"localhost", family, display_id)
       auth_name, auth_data = auth_info.address, auth_info.auth_data
 
       handshake = Form::ClientHandshake.new(
