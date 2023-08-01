@@ -43,7 +43,7 @@ module X11
       # with each entry from XAuthority file
       until @file.eof?
         r = read()
-        auth_data = r if display_id.to_i == r.display.to_i
+        auth_data = r if r.display.empty? || display_id.to_i == r.display.to_i
       end
 
       reset
