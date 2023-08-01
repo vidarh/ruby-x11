@@ -7,6 +7,14 @@ module X11
       @internal = data
     end
 
+    def root
+      @internal.root
+    end
+
+    def root_depth
+      @internal.root_depth
+    end
+
     def width
       @internal.width_in_pixels
     end
