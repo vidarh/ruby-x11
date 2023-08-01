@@ -27,8 +27,11 @@ module X11
       # initialize field accessors
       def initialize(*params)
         self.class.fields.each do |f|
-          param = params.shift
-          instance_variable_set("@#{f.name}", param)
+          if !f.value
+            param = params.shift
+            #p [f,param]
+            instance_variable_set("@#{f.name}", param)
+          end
         end
       end
 
@@ -42,26 +45,42 @@ module X11
           value = s.type == :unused ? nil : instance_variable_get("@#{s.name}")
           case s.type
           when :field
+            if s.value
+              if s.value.respond_to?(:call)
+                value = s.value.call(self)
+              else
+                value = s.value
+              end
+            end
+
             if value.is_a?(BaseForm)
               value.to_packet
             else
               s.type_klass.pack(value)
             end
           when :unused
-            "\x00" * s.size
+            sz = s.size.respond_to?(:call) ? s.size.call(self) : s.size
+            "\x00" * sz
           when :length
             s.type_klass.pack(value.size)
           when :string
             s.type_klass.pack(value)
           when :list
             value.collect do |obj|
-              obj.to_packet
+              p obj
+              if obj.is_a?(BaseForm)
+                obj.to_packet
+              else
+                s.type_klass.pack(obj)
+              end
             end
           end
         end.join
       end
 
       class << self
+        # FIXME: Doing small reads from socket is a bad idea, and
+        # the protocol provides length fields that makes it unnecessary.
         def from_packet(socket)
           # fetch class level instance variable holding defined fields
 
@@ -78,7 +97,8 @@ module X11
               end
               form.instance_variable_set("@#{s.name}", val)
             when :unused
-              socket.read(s.size)
+              sz = s.size.respond_to?(:call) ? s.size.call(self) : s.size
+              socket.read(sz)
             when :length
               size = s.type_klass.unpack( socket.read(s.type_klass.size) )
               lengths[s.name] = size
@@ -96,14 +116,15 @@ module X11
           return form
         end
 
-        def field(*args)
-          name, type_klass, type = args
+        def field(name, type_klass, type = nil, value: nil)
+          # name, type_klass, type = args
           class_eval { attr_accessor name }
 
           s = OpenStruct.new
           s.name = name
           s.type = (type == nil ? :field : type)
           s.type_klass = type_klass
+          s.value = value
 
           @structs ||= []
           @structs << s
@@ -205,6 +226,210 @@ module X11
       field :vendor, String8, :string
       field :formats, FormatInfo, :list
       field :screens, ScreenInfo, :list
+    end
+
+    class Rectangle < BaseForm
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+    end
+
+    class Error < BaseForm
+      field :error, Uint8
+      field :code,  Uint8
+      field :sequence_number, Uint16
+      field :bad_resource_id, Uint32
+      field :minor_opcode, Uint16
+      field :major_opcode, Uint8
+      unused 21
+    end
+
+
+    # Requests
+
+    CopyFromParent = 0
+    InputOutput = 1
+    InputOnly = 2
+
+    CWBackPixel = 0x0002
+    CWEventMask = 0x0800
+
+    KeyPressMask           = 0x00001
+    ButtonPressMask        = 0x00004
+    ExposureMask           = 0x08000
+    StructureNotifyMask    = 0x20000
+    SubstructureNotifyMask = 0x80000
+
+    class CreateWindow < BaseForm
+      field :opcode, Uint8, value: 1
+      field :depth,  Uint8
+      field :request_length, Uint16, value: ->(cw) { len = 8 + cw.value_list.length; p len; len }
+      field :wid, Window
+      field :parent, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :border_width, Uint16
+      field :window_class, Uint16
+      field :visual, VisualID
+      field :value_mask, Bitmask
+      field :value_list, Uint32, :list
+    end
+
+    class MapWindow < BaseForm
+      field :opcode, Uint8, value: 8
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class OpenFont < BaseForm
+      field :opcode, Uint8, value: 45
+      unused 1
+      field :request_length, Uint16, value: ->(of) {
+        3+(of.name.length+3)/4
+      }
+      field :fid, Font
+      field :name, Uint16, :length
+      unused 2
+      field :name, String8, :string
+    end
+    
+    class ListFonts < BaseForm
+      field :opcode, Uint8, value: 49
+      unused 1
+      field :request_length, Uint16, value: ->(lf) {
+        2+(lf.pattern.length+4)/4
+      }
+      field :max_names, Uint16
+      field :length_of_pattern, Uint16,value: ->(lf) {
+        lf.pattern.length
+      }
+      field :pattern, String8
+    end
+
+    class Str < BaseForm
+      field :name, Uint8, :length, value: ->(str) { str.name.length }
+      field :name, String8Unpadded, :string
+
+      def to_s
+        name
+      end
+    end
+
+    class ListFontsReply < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :names, Uint16, :length
+      unused 22
+      field :names, Str, :list
+    end
+
+    FunctionMask = 0x1
+    PlaneMask = 0x2
+    ForegroundMask = 0x04
+    BackgroundMask = 0x08
+    FontMask = 0x4000
+
+    class CreateGC < BaseForm
+      field :opcode, Uint8, value: 55
+      unused 1
+      field :request_length, Uint16, value: ->(cw) {
+        len = 4 + cw.value_list.length
+      }
+      field :cid, Gcontext
+      field :drawable, Drawable
+      field :value_mask, Bitmask
+      field :value_list, Uint32, :list
+    end
+
+    class ChangeGC < BaseForm
+      field :opcode, Uint8, value: 56
+      unused 1
+      field :request_length, Uint16, value: ->(ch) {
+        3+ ch.value_list.length
+      }
+      field :gc, Gcontext
+      field :value_mask, Bitmask
+      field :value_list, Uint32, :list
+    end
+
+    class ClearArea < BaseForm
+      field :opcode, Uint8, value: 61
+      field :exposures, Bool
+      field :request_length, Uint16, value: 4
+      field :window, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+    end
+
+    class PolyFillRectangle < BaseForm
+      field :opcode, Uint8, value: 70
+      unused 1
+      field :request_length, Uint16, value: ->(ob) {
+        len = 3 + 2*(Array(ob.rectangles).length)
+      }
+      field :drawable, Drawable
+      field :gc, Uint32
+      field :rectangles, Rectangle, :list
+    end
+
+    class ImageText8 < BaseForm
+      field :opcode, Uint8, value: 76
+      field :n, Uint8, :length
+      field :request_length, Uint16, value: ->(it) { 4+(it.n.length+4)/4 }
+      field :drawable, Drawable
+      field :gc, Gcontext
+      field :x, Int16
+      field :y, Int16
+      field :n, String8, :string
+    end
+
+    # Events (page ~157)
+    # FIXME: Events have quite a bit of redundancy, but unfortunately
+    # BaseForm can't handle subclassing well.
+
+    class Expose < BaseForm
+      field :code, Uint8
+      unused 1
+      field :sequence_number, Uint16
+      field :widow, Window
+      field :x, Uint16
+      field :y, Uint16
+      field :width, Uint16
+      field :height, Uint16
+      field :count, Uint16
+      unused 14
+    end
+
+    class MapNotify < BaseForm
+      field :code, Uint8
+      unused 1
+      field :sequence_number, Uint16
+      field :event, Window
+      field :override_redirect, Bool
+      unused 19
+    end
+    
+    class ConfigureNotify < BaseForm
+      field :code, Uint8
+      unused 1
+      field :sequence_number, Uint16
+      field :event, Window
+      field :above_sibling, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :border_width, Uint16
+      field :override_redirect, Bool
+      unused 5
     end
   end
 end
