@@ -37,6 +37,7 @@ module X11
         x + "\x00"*(-x.length & 3)
       end
 
+
       def self.unpack(socket, size)
         val = socket.read(size)
         unused_padding = (4 - (size % 4)) % 4
@@ -45,9 +46,33 @@ module X11
       end
     end
 
+    class String8Unpadded
+      def self.pack(x)
+        x
+      end
+
+
+      def self.unpack(socket, size)
+        val = socket.read(size)
+      end
+    end
+    
+    class Bool
+      def self.pack(x)
+        x ? "\x01" : "\x00"
+      end
+
+      def self.unpack(str)
+        str[0] == "0x01"
+      end
+
+      def self.size
+        1
+      end
+    end
+    
     KeyCode      = Uint8
     Signifigance = Uint8
-    Bool         = Uint8
     BitGravity   = Uint8
     WinGravity   = Uint8
     BackingStore = Uint8
