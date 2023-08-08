@@ -1,5 +1,6 @@
 require 'rubygems'
 require 'bundler'
+require 'chunky_png'
 Bundler.setup(:default, :development)
 
 $LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
@@ -17,12 +18,13 @@ display.write_request(X11::Form::CreateWindow.new(
   root,
   0,  #x
   0,  #y
-  200,#w
-  200,#h
+  1000,#w
+  600,#h
   0,
   X11::Form::InputOutput,
   X11::Form::CopyFromParent,
-  X11::Form::CWBackPixel | X11::Form::CWEventMask,
+  X11::Form::CWBackPixel |
+    X11::Form::CWEventMask,
   [0xff8844, # RGB background
    X11::Form::SubstructureNotifyMask |
 #   X11::Form::StructureNotifyMask    | ## Move
@@ -52,6 +54,14 @@ display.write_request(X11::Form::CreateGC.new(
   ]
 ))
 
+$gc3 = display.new_id
+display.write_request(X11::Form::CreateGC.new(
+  $gc3,
+  screen.root,
+  0, []
+))
+
+
 puts "Main loop"
 p gc
 
@@ -63,6 +73,9 @@ fid = display.new_id
 display.write_request(X11::Form::OpenFont.new(fid, "7x13"))
 display.write_request(X11::Form::ChangeGC.new($gc2, X11::Form::FontMask, [fid]))
 
+$png = ChunkyPNG::Image.from_file('genie.png')
+p $png.width
+p $png.height
 
 def redraw(display, wid, gc)
   p [:redraw, gc]
@@ -73,13 +86,23 @@ def redraw(display, wid, gc)
 
   display.write_request(X11::Form::ClearArea.new( false, wid, 30, 30, 5, 5))
   display.write_request(X11::Form::ImageText8.new(wid, $gc2, 30, 70, "Hello World"))
+
+  depth = 24
+  # FIXME: The colors are wrong
+  #  pixels.pack("N*")
+  data = ""
+  $png.pixels.each do |px|
+    str = [px].pack("N")
+    data << str[2] << str[1] << str[0] << str[3]
+  end
+  display.write_request(X11::Form::PutImage.new(
+    X11::Form::ZPixmap, wid, $gc2, $png.width, $png.height, 80, 80, 0, depth, data))
 end
 
 loop do
   pkt = display.next_packet
   if pkt
     p pkt
-    redraw(display, wid, gc)
+    redraw(display, wid, gc) if pkt.is_a?(X11::Form::Expose)
   end
 end
-

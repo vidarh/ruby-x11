@@ -380,6 +380,28 @@ module X11
       field :rectangles, Rectangle, :list
     end
 
+    Bitmap = 0
+    XYPixmap=1
+    ZPixmap=2
+    
+    class PutImage < BaseForm
+      field :opcode, Uint8, value: 72
+      field :format, Uint8
+      field :request_length, Uint16, value: ->(pi) {
+        6+(pi.data.length+3)/4
+      }
+      field :drawable, Drawable
+      field :gc, Gcontext
+      field :width, Uint16
+      field :height, Uint16
+      field :dstx, Int16
+      field :dsty, Int16
+      field :left_pad, Uint8
+      field :depth, Uint8
+      unused 2
+      field :data, String8 #, :string
+    end
+
     class ImageText8 < BaseForm
       field :opcode, Uint8, value: 76
       field :n, Uint8, :length
