@@ -3,15 +3,15 @@ $:.push File.expand_path("../lib", __FILE__)
 require "X11/version"
 
 Gem::Specification.new do |s| 
-  s.name        = "ruby-x11"
+  s.name        = "pure-x11"
   s.version     = X11::VERSION
-  s.authors     = ["Richard Ramsden"]
-  s.email       = ["richard@rramsden.ca"]
+  s.authors     = ["Vidar Hokstad", "Richard Ramsden"]
+  s.email       = ["vidar@hokstad.com"]
   s.homepage    = ""
-  s.summary     = "Ruby X11 bindings"
-  s.description = "Ruby X11 bindings"
+  s.summary     = "Pure Ruby X11 bindings"
+  s.description = "Pure Ruby X11 bindings"
 
-  s.rubyforge_project = "ruby-x11"
+  #s.rubyforge_project = "ruby-x11"
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
