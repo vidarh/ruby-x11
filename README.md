@@ -1,8 +1,13 @@
-Ruby X11
+Pure X11
 ========
 
+This library is now on Rubygems.org as "pure-X11" as I (vidarh) has not had a
+response from the original author. If that should change, I'll be happy to
+upstread everything.
+
 (under-development) Pure Ruby implementation of the X Window System Protocol.
-This library is based off of Mathieu Bouchard's work on his RubyX11 project.
+This library is based off of Mathieu Bouchard's work on his RubyX11 project,
+and Richard Ramsdens excellent start on Ruby-X11.
 
 Contributors
 ------------
