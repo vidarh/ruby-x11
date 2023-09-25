@@ -3,8 +3,6 @@ module X11
 end
 
 require 'socket'
-require 'active_support'
-require 'hexdump'
 require 'X11/protocol'
 require 'X11/auth'
 require 'X11/display'
