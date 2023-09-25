@@ -43,8 +43,8 @@ describe X11::Form::BaseForm do
     parent.name = "Parent Form"
     parent.point = Point.new(0,0)
 
-    parent.point.must_be_instance_of Point
-    parent.name.must_equal "Parent Form"
+    _(parent.point).must_be_instance_of Point
+    _(parent.name).must_equal "Parent Form"
 
     parent.children = []
     parent.children << Child.new
@@ -58,9 +58,9 @@ describe X11::Form::BaseForm do
     socket = MockSocket.new(parent.to_packet)
 
     decoded = Parent.from_packet(socket)
-    decoded.value.must_equal 255
-    decoded.name.must_equal "Parent Form"
-    decoded.point.x.must_equal 23
-    decoded.point.y.must_equal 17
+    _(decoded.value).must_equal 255
+    _(decoded.name).must_equal "Parent Form"
+    _(decoded.point.x).must_equal 23
+    _(decoded.point.y).must_equal 17
   end
 end
