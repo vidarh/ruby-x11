@@ -15,6 +15,10 @@ module X11
       @internal.root_depth
     end
 
+    def root_visual
+      @internal.root_visual
+    end
+
     def width
       @internal.width_in_pixels
     end

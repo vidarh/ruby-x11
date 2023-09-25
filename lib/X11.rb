@@ -3,9 +3,10 @@ module X11
 end
 
 require 'socket'
-require 'X11/protocol'
-require 'X11/auth'
-require 'X11/display'
-require 'X11/screen'
-require 'X11/type'
-require 'X11/form'
+require_relative './X11/protocol'
+require_relative './X11/auth'
+require_relative './X11/display'
+require_relative './X11/screen'
+require_relative './X11/type'
+require_relative './X11/form'
+require_relative './X11/keysyms'

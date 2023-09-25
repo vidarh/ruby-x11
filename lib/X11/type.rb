@@ -20,6 +20,11 @@ module X11
           def self.size
             #{bytesize}
           end
+
+          def self.from_packet(sock)
+            r = sock.read(size)
+            r ? unpack(r) : nil
+          end
         end
       }
     end
@@ -34,8 +39,10 @@ module X11
 
     class String8
       def self.pack(x)
-        x + "\x00"*(-x.length & 3)
+        x.force_encoding("ASCII-8BIT") + "\x00"*(-x.length & 3)
       end
+
+
 
 
       def self.unpack(socket, size)
@@ -45,6 +52,20 @@ module X11
         val
       end
     end
+
+    class String16
+      def self.pack(x)
+        x.encode("UTF-16BE").force_encoding("ASCII-8BIT") + "\x00\x00"*(-x.length & 1)
+      end
+
+      def self.unpack(socket, size)
+        val = socket.read(size)
+        unused_padding = (4 - (size % 4)) % 4
+        socket.read(unused_padding)
+        val.force_encoding("UTF-16BE")
+      end
+    end
+
 
     class String8Unpadded
       def self.pack(x)
@@ -63,7 +84,7 @@ module X11
       end
 
       def self.unpack(str)
-        str[0] == "0x01"
+        str[0] == "\x01"
       end
 
       def self.size
@@ -90,6 +111,6 @@ module X11
     VisualID     = Uint32
     Mask         = Uint32
     Timestamp    = Uint32
-
+    Keysym       = Uint32
   end
 end
