@@ -529,7 +529,12 @@ module X11
       auth = Auth.new
       auth_info = auth.get_by_hostname(host||"localhost", family, display_id)
 
-      auth_name, auth_data = auth_info.auth_name, auth_info.auth_data
+      if auth_info
+        auth_name, auth_data = auth_info.auth_name, auth_info.auth_data
+      else
+        auth_name = ""
+        auth_data = ""
+      end
       p [auth_name, auth_data]
 
       handshake = Form::ClientHandshake.new(
