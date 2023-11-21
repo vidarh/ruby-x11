@@ -86,6 +86,8 @@ module X11
         return Form::KeyRelease.from_packet(StringIO.new(data))
       when 4
         return Form::ButtonPress.from_packet(StringIO.new(data))
+      when 5
+        return Form::ButtonRelease.from_packet(StringIO.new(data))
       when 6
         return Form::MotionNotify.from_packet(StringIO.new(data))
       when 12
@@ -177,9 +179,46 @@ module X11
       end
     end
 
+    def find_visual(screen, depth, qlass = 4)
+      self.display_info.screens[screen].depths.find{|d|
+        d.depth == depth }.visuals.find{|v| v.qlass = qlass }
+    end
+
     # Requests
-    def create_window(*args)
-      write_request(X11::Form::CreateWindow.new(*args))
+    def create_window(x,y,w,h,
+      values: {},
+      depth: 32, parent: nil, border_width: 0, wclass: X11::Form::InputOutput, visual: nil
+    )
+      wid = new_id
+      parent ||= screens.first.root
+
+
+      if visual.nil?
+        visual = find_visual(0, depth).visual_id
+      end
+
+
+      values[X11::Form::CWColorMap] ||= create_colormap(0, parent, visual)
+
+      values = values.sort_by{_1[0]}
+      mask =   values.inject(0) {|acc,v| (acc | v[0]) }
+      values = values.map{_1[1]}
+      write_request(
+        X11::Form::CreateWindow.new(
+          depth, wid, parent,
+          x,y,w,h,border_width, wclass, visual, mask, values)
+      )
+      return wid
+    end
+
+    def change_window_attributes(wid,
+      values: {})
+      values = values.sort_by{_1[0]}
+      mask =   values.inject(0) {|acc,v| (acc | v[0]) }
+      values = values.map{_1[1]}
+      write_request(
+        X11::Form::ChangeWindowAttributes.new(wid, mask, values)
+      )
     end
 
     def atom(name)
@@ -211,6 +250,14 @@ module X11
       end
     end
 
+    def destroy_window(window)
+      write_request(X11::Form::DestroyWindow.new(window))
+    end
+    
+    def get_geometry(drawable)
+      write_sync(X11::Form::GetGeometry.new(drawable), X11::Form::Geometry)
+    end
+    
     def get_keyboard_mapping(min_keycode=display_info.min_keycode, count= display_info.max_keycode - min_keycode)
       write_sync(X11::Form::GetKeyboardMapping.new(min_keycode, count), X11::Form::GetKeyboardMappingReply)
     end
@@ -240,6 +287,77 @@ module X11
 
     def map_window(*args)
       write_request(X11::Form::MapWindow.new(*args))
+    end
+
+    def grab_key(owner_events, grab_window, modifiers, keycode, pointer_mode, keyboard_mode)
+      write_request(X11::Form::GrabKey.new(
+        owner_events,
+        grab_window,
+        modifiers,
+        keycode,
+        pointer_mode == :async ? 1 : 0,
+        keyboard_mode == :async ? 1 : 0
+      ))
+    end
+
+    def grab_button(owner_events, grab_window, event_mask, pointer_mode,
+      keyboard_mode, confine_to, cursor, button, modifiers)
+      write_request(X11::Form::GrabButton.new(
+        owner_events, grab_window, event_mask,
+        pointer_mode == :async ? 1 : 0,
+        keyboard_mode == :async ? 1 : 0,
+        confine_to.to_i, cursor.to_i, button, modifiers)
+      )
+    end
+
+    def configure_window(window, x: nil, y: nil, width: nil, height: nil,
+      border_width: nil, sibling: nil, stack_mode: nil)
+
+      mask = 0
+      values = []
+
+      if x
+        mask |= 0x001
+        values << x
+      end
+
+      if y
+        mask |= 0x002
+        values << y
+      end
+
+      if width
+        mask |= 0x004
+        values << width
+      end
+
+      if height
+        mask |= 0x008
+        values << height
+      end
+
+      if border_width
+        mask |= 0x010
+        values << border_width
+      end
+
+      if sibling
+        mask |= 0x020
+        values << sibling
+      end
+
+      if stack_mode
+        mask |= 0x040
+        values << case stack_mode
+                  when :above then 0
+                  when :below then 1
+                  when :top_if then 2
+                  when :bottom_if then 3
+                  when  :opposite then 4
+                  else raise "Unknown stack_mode #{stack_mode.inspect}"
+                  end
+      end
+      write_request(X11::Form::ConfigureWindow.new(window, mask, values))
     end
 
 
@@ -329,7 +447,7 @@ module X11
         s.depths.map do |d|
           d.visuals.map {|v| v.visual == visual ? v : nil }
         end
-      end.flatten.compact.first.format
+      end.flatten.compact.first&.format
     end
     
     def render_find_standard_format(sym)

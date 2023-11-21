@@ -332,14 +332,26 @@ module X11
     InputOutput = 1
     InputOnly = 2
 
-    CWBackPixel = 0x0002
+    CWBackPixmap  = 0x0001
+    CWBackPixel   = 0x0002
+    CWBorderPixmap= 0x0004
     CWBorderPixel = 0x0008
-    CWEventMask = 0x0800
-    CWColorMap  = 0x2000
+    CWBitGravity  = 0x0010
+    CWWinGravity  = 0x0020
+    CWBackingStore= 0x0040
+    CWSaveUnder   = 0x0400
+    CWEventMask   = 0x0800
+    CWColorMap    = 0x2000
 
     KeyPressMask           = 0x00001
+    KeyReleaseMask         = 0x00002
     ButtonPressMask        = 0x00004
+    ButtonReleaseMask      = 0x00008
+    EnterWindowMask        = 0x00010
+    LeaveWindowMask        = 0x00020
     PointerMotionMask      = 0x00040
+    PointerMotionHintMask  = 0x00080
+    Button1MotionMask      = 0x00100
     ExposureMask           = 0x08000
     StructureNotifyMask    = 0x20000
     SubstructureNotifyMask = 0x80000
@@ -361,11 +373,87 @@ module X11
       field :value_list, Uint32, :list
     end
 
+    class ChangeWindowAttributes < BaseForm
+      field :opcode, Uint8, value: 2
+      unused 1
+      field :request_length, Uint16, value: ->(cw) { 3 + cw.value_list.length }
+      field :window, Window
+      field :value_mask, Bitmask
+      field :value_list, Uint32, :list
+    end
+
+    class GetWindowAttributes < BaseForm
+      field :opcode, Uint8, value: 3
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class WindowAttributes < BaseForm
+      field :reply, Uint8, value: 1
+      field :backing_store, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :visual, VisualID
+      field :class, Uint16
+      field :bit_gravity, Uint8
+      field :win_gravity, Uint8
+      field :backing_planes, Uint32
+      field :backing_pixel, Uint32
+      field :save_under, Bool
+      field :map_is_installed, Bool
+      field :map_state, Bool
+      field :override_redirect, Bool
+      field :colormap, Colormap
+      field :all_event_masks, Uint32
+      field :your_event_masks, Uint32
+      field :do_not_propagate_mask, Uint16
+      unused 2
+    end
+
+    class DestroyWindow < BaseForm
+      field :opcode, Uint8, value: 4
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
     class MapWindow < BaseForm
       field :opcode, Uint8, value: 8
       unused 1
       field :request_length, Uint16, value: 2
       field :window, Window
+    end
+
+    class ConfigureWindow < BaseForm
+      field :opcode, Uint8, value: 12
+      unused 1
+      field :request_length, Uint16, value: ->(cw) { 3 + cw.values.length }
+      field :window, Window
+      field :value_mask, Uint16
+      unused 2
+      field :values, Uint32, :list
+    end
+
+    class GetGeometry < BaseForm
+      field :opcode, Uint8, value: 14
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :drawable, Drawable
+    end
+
+    class Geometry < BaseForm
+      field :reply, Uint8, value: 1
+      field :depth, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :root, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :border_width, Uint16
+      unused 10
     end
 
     class InternAtom < BaseForm
@@ -415,16 +503,31 @@ module X11
       field :data, Uint8, :list
     end
 
-    class OpenFont < BaseForm
-      field :opcode, Uint8, value: 45
+    class GrabButton < BaseForm
+      field :opcode, Uint8, value: 28
+      field :owner_events, Bool
+      field :request_length, Uint16, value: 6
+      field :grab_window, Window
+      field :event_mask, Uint16
+      field :pointer_mode, Uint8
+      field :keyboard_mode, Uint8
+      field :confine_to, Window
+      field :cursor, Cursor
+      field :button, Uint8
       unused 1
-      field :request_length, Uint16, value: ->(of) {
-        3+(of.name.length+3)/4
-      }
-      field :fid, Font
-      field :name, Uint16, :length
-      unused 2
-      field :name, String8, :string
+      field :modifiers, Uint16
+    end
+
+    class GrabKey < BaseForm
+      field :opcode, Uint8, value: 33
+      field :owner_event, Bool
+      field :request_length, Uint16, value: 4
+      field :grab_window, Window
+      field :modifiers, Uint16
+      field :keycode, Uint8
+      field :pointer_mode, Uint8
+      field :keyboard_mode, Uint8
+      unused 3
     end
     
     class ListFonts < BaseForm
@@ -676,6 +779,9 @@ module X11
     end
 
     class MotionNotify < PressEvent
+    end
+
+    class ButtonRelease < PressEvent
     end
     
     class Expose < SimpleEvent

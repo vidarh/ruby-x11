@@ -114,13 +114,18 @@ module X11
     0xff9d => :XK_KP_Begin,
     0xff9e => :XK_KP_Insert,
     0xff9f => :XK_KP_Delete,
-    0xffbd => :XK_KP_Equal,
     0xffaa => :XK_KP_Multiply,
     0xffab => :XK_KP_Add,
     0xffac => :XK_KP_Separator,
     0xffad => :XK_KP_Subtract,
     0xffae => :XK_KP_Decimal,
     0xffaf => :XK_KP_Divide,
+    0xffbd => :XK_KP_Equal,
+    0xffbe => :f1,
+    0xffbf => :f2,
+    0xffc0 => :f3,
+    0xffc1 => :f4, # And so on
+
 
     0xffe1 => :XK_Shift_L,
     0xffe2 => :XK_Shift_R,
