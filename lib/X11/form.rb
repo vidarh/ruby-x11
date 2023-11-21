@@ -1,4 +1,3 @@
-require 'ostruct'
 
 module X11
   module Form
