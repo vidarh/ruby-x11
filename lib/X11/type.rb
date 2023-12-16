@@ -36,16 +36,23 @@ module X11
     define "Uint8", "C", 1
     define "Uint16", "S", 2
     define "Uint32", "L", 4
+    
+    define "Message", "c*", 20
+
+    class Message
+      def self.pack(x) = x.b
+      def self.unpack(x) = x.b
+      def self.size = 20
+      def self.from_packet(sock) = sock.read(2).b
+    end
 
     class String8
       def self.pack(x)
         x.force_encoding("ASCII-8BIT") + "\x00"*(-x.length & 3)
       end
 
-
-
-
       def self.unpack(socket, size)
+        raise "Expected size for String8" if size.nil?
         val = socket.read(size)
         unused_padding = (4 - (size % 4)) % 4
         socket.read(unused_padding)

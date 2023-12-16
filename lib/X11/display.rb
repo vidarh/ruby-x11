@@ -68,6 +68,7 @@ module X11
     def read_error data
       error = Form::Error.from_packet(StringIO.new(data))
       STDERR.puts "ERROR: #{error.inspect}"
+      raise error.inspect
       error
     end
 
@@ -80,28 +81,47 @@ module X11
     end
 
     def read_event type, data, event_class
+      io = StringIO.new(data)
       case type
-      when 2
-        return Form::KeyPress.from_packet(StringIO.new(data))
-      when 3
-        return Form::KeyRelease.from_packet(StringIO.new(data))
-      when 4
-        return Form::ButtonPress.from_packet(StringIO.new(data))
-      when 5
-        return Form::ButtonRelease.from_packet(StringIO.new(data))
-      when 6
-        return Form::MotionNotify.from_packet(StringIO.new(data))
-      when 12
-        return Form::Expose.from_packet(StringIO.new(data))
-      when 14
-        return Form::NoExposure.from_packet(StringIO.new(data))
-      when 19
-        return Form::MapNotify.from_packet(StringIO.new(data))
-      when 22
-        return Form::ConfigureNotify.from_packet(StringIO.new(data))
+      # 0 is error, not handled here
+      # 1 is reply, not handled here
+      when 2  then return Form::KeyPress.from_packet(io)
+      when 3  then return Form::KeyRelease.from_packet(io)
+      when 4  then return Form::ButtonPress.from_packet(io)
+      when 5  then return Form::ButtonRelease.from_packet(io)
+      when 6  then return Form::MotionNotify.from_packet(io)
+      when 7  then return Form::EnterNotify.from_packet(io)
+      when 8  then return Form::LeaveNotify.from_packet(io)
+      when 9  then return Form::FocusIn.from_packet(io)
+      when 10 then return Form::FocusOut.from_packet(io)
+      # FIXME 11: KeymapNotify
+      when 12 then return Form::Expose.from_packet(io)
+      # FIXME 13: GraphicsExposure
+      when 14 then return Form::NoExposure.from_packet(io)
+      # FIXME: 15: VisibilityNotify
+      when 16 then return Form::CreateNotify.from_packet(io)
+      when 17 then return Form::DestroyNotify.from_packet(io)
+      when 18 then return Form::UnmapNotify.from_packet(io)
+      when 19 then return Form::MapNotify.from_packet(io)
+      when 20 then return Form::MapRequest.from_packet(io)
+      when 21 then return Form::ReparentNotify.from_packet(io)
+      when 22 then return Form::ConfigureNotify.from_packet(io)
+      when 23 then return Form::ConfigureRequest.from_packet(io)
+      # FIXME: 24: GravityNotify
+      # FIXME: 25: ResizeRequest
+      # FIXME: 26: CirculateNotify
+      # FIXME: 27: CirculateRequest
+      when 28 then return Form::PropertyNotify.from_packet(io)
+      # FIXME: 29: SelectionClear
+      # FIXME: 30: SelectionRequest
+      # FIXME: 31: SelectionNotify
+      # FIXME: 32: ColormapNotify
+      when 33 then return Form::ClientMessage.from_packet(StringIO.new(data))
+      # FIXME: 34: MappingNotify
       else
         STDERR.puts "FIXME: Event: #{type}"
         STDERR.puts "EVENT: #{data.inspect}"
+        data
       end
     end
 
@@ -122,19 +142,28 @@ module X11
       data = read_full_packet(32)
       return nil if data.nil?
 
-      type = data.unpack("C").first
+      # FIXME: What is bit 8 for? Synthentic?
+      type = data.unpack("C").first & 0x7f
       case type
-      when 0
-        read_error(data)
-      when 1
-        read_reply(data)
-      when 2..34
-        read_event(type, data, nil)
+      when 0 then read_error(data)
+      when 1 then read_reply(data)
+      when 2..34 then read_event(type, data, nil)
       else
-        raise ProtocolError, "Unsupported reply type: #{type}"
+        raise ProtocolError, "Unsupported reply type: #{type} #{data.inspect}"
       end
     end
 
+    def write_raw_packet(pkt)
+      @requestseq += 1
+      @socket.write(pkt)
+    end
+    
+    def write_packet(*args)
+      pkt = args.join
+      pkt[2..3] = u16(pkt.length/4)
+      write_raw_packet(pkt)
+    end
+    
     def write_request ob
       #p data
       #p [:write_request, @requestseq, ob.class]
@@ -142,14 +171,16 @@ module X11
       #p [:AddGlyph,data] if ob.is_a?(X11::Form::XRenderAddGlyphs)
       #p [ob.request_length.to_i*4, data.size]
       raise "BAD LENGTH for #{ob.inspect} (#{ob.request_length.to_i*4} ! #{data.size} " if ob.request_length && ob.request_length.to_i*4 != data.size
-      @requestseq += 1
-      @socket.write(data)
+      write_raw_packet(data)
     end
 
     def write_sync(data, reply=nil)
+      seq = @requestseq
       write_request(data)
-      pkt = next_reply
+      pkt = next_reply(seq)
       return nil if !pkt
+      return pkt if pkt.is_a?(X11::Form::Error)
+      pp reply
       reply ? reply.from_packet(StringIO.new(pkt)) : pkt
     end
 
@@ -161,17 +192,19 @@ module X11
       @queue.shift || read_packet
     end
 
-    def next_reply
+    def next_reply(errseq)
       # FIXME: This is totally broken
       while pkt = read_packet
         if pkt.is_a?(String)
+          return pkt
+        elsif pkt.is_a?(X11::Form::Error) && pkt.sequence_number == errseq
           return pkt
         else
           @queue.push(pkt)
         end
       end
     end
-
+ 
     def run
       loop do
         pkt = read_packet
@@ -193,11 +226,9 @@ module X11
       wid = new_id
       parent ||= screens.first.root
 
-
       if visual.nil?
         visual = find_visual(0, depth).visual_id
       end
-
 
       values[X11::Form::CWColorMap] ||= create_colormap(0, parent, visual)
 
@@ -212,6 +243,10 @@ module X11
       return wid
     end
 
+    def get_window_attributes(wid)
+      write_sync( Form::GetWindowAttributes.new(wid), Form::WindowAttributes )
+    end
+
     def change_window_attributes(wid,
       values: {})
       values = values.sort_by{_1[0]}
@@ -222,7 +257,10 @@ module X11
       )
     end
 
+    def select_input(w, events) = change_window_attributes(w, values: {Form::CWEventMask => events})
+
     def atom(name)
+      name = name.to_sym
       intern_atom(false, name) if !@atoms[name]
       @atoms[name]
     end
@@ -251,13 +289,13 @@ module X11
       end
     end
 
-    def destroy_window(window)
-      write_request(X11::Form::DestroyWindow.new(window))
+    def get_atom_name(atom)
+      reply = write_sync(X11::Form::GetAtomName.new(atom), X11::Form::AtomName)
+      reply&.name
     end
-    
-    def get_geometry(drawable)
-      write_sync(X11::Form::GetGeometry.new(drawable), X11::Form::Geometry)
-    end
+
+    def destroy_window(window) = write_request(X11::Form::DestroyWindow.new(window))
+    def get_geometry(drawable) = write_sync(X11::Form::GetGeometry.new(drawable), X11::Form::Geometry)
     
     def get_keyboard_mapping(min_keycode=display_info.min_keycode, count= display_info.max_keycode - min_keycode)
       write_sync(X11::Form::GetKeyboardMapping.new(min_keycode, count), X11::Form::GetKeyboardMappingReply)
@@ -269,8 +307,35 @@ module X11
       mid
     end
 
-    def change_property(*args)
-      write_request(X11::Form::ChangeProperty.new(*args))
+    def get_property(window, property, type, offset: 0, length: 4, delete: false)
+      property = atom(property) if !property.is_a?(Integer)
+      type     = atom_enum(type)
+      
+      result = write_sync(X11::Form::GetProperty.new(
+        delete, window, property, type, offset, length
+      ), X11::Form::Property)
+
+      if result && result.format != 0
+        case result.format
+        when 16
+          result.value = result.value.unpack("v")
+          result.value = result.value.first if length == 2
+        when 32
+          result.value = result.value.unpack("V")
+          result.value = result.value.first if length == 4
+        end
+      elsif result
+        result.value = nil
+      end
+      result
+    end
+    
+    def change_property(mode, window, property, type, format, data)
+      property = atom(property.to_sym) if property.is_a?(Symbol) || property.is_a?(String)
+
+      mode = open_enum(mode, {replace: 0, prepend: 1, append: 2})
+      type = atom_enum(type)
+      write_request(X11::Form::ChangeProperty.new(mode, window, property, type, format, data))
     end
 
     def list_fonts(*args)
@@ -278,25 +343,46 @@ module X11
         X11::Form::ListFontsReply)
     end
 
-    def open_font(*args)
-      write_request(X11::Form::OpenFont.new(*args))
+    def open_font(*args)    = write_request(X11::Form::OpenFont.new(*args))
+    def change_gc(*args)    = write_request(X11::Form::ChangeGC.new(*args))
+    def change_save_set(...)= write_request(X11::Form::ChangeSaveSet.new(...))
+    def reparent_window(window, parent, x, y, save: true)
+      # You so almost always want this that it should've been a single request
+      change_save_set(0, window) if save
+      write_request(X11::Form::ReparentWindow.new(window, parent, x,y))
+    end
+    
+    def map_window(*args)   = write_request(X11::Form::MapWindow.new(*args))
+    def unmap_window(*args) = write_request(X11::Form::UnmapWindow.new(*args))
+
+    def u8(*args)  = args.pack("c*")
+    def u16(*args) = args.pack("v*")
+    def u32(*args) = args.pack("V*")
+    def atom_enum(val) = open_enum(val, {cardinal: Form::CardinalAtom, atom: Form::AtomAtom, window: Form::WindowAtom})
+    def window(*args)
+      args.each {|a| raise "Window expected" if a.nil? }
+      u32(*args)
     end
 
-    def change_gc(*args)
-      write_request(X11::Form::ChangeGC.new(*args))
+    def open_enum(val, map) = (map[val].nil? ? val : map[val])
+      
+    def set_input_focus(revert_to, focus, time=:now)
+      # FIXME: This is an experiment.
+      # Upside: Simpler. Downside: Doesn't work server-side.
+      # 
+      revert_to = open_enum(revert_to, {none: 0, pointer_root: 1, parent: 2})
+      focus     = open_enum(focus,     {none: 0, pointer_root: 1 })
+      time      = open_enum(time,      {current_time: 0, now: 0})
+      write_packet(u8(42,revert_to), u16(3), window(focus), u32(time))
     end
-
-    def map_window(*args)
-      write_request(X11::Form::MapWindow.new(*args))
-    end
-
+      
     def grab_key(owner_events, grab_window, modifiers, keycode, pointer_mode, keyboard_mode)
       write_request(X11::Form::GrabKey.new(
         owner_events,
         grab_window,
         modifiers,
         keycode,
-        pointer_mode == :async ? 1 : 0,
+        pointer_mode  == :async ? 1 : 0,
         keyboard_mode == :async ? 1 : 0
       ))
     end
@@ -354,7 +440,7 @@ module X11
                   when :below then 1
                   when :top_if then 2
                   when :bottom_if then 3
-                  when  :opposite then 4
+                  when :opposite then 4
                   else raise "Unknown stack_mode #{stack_mode.inspect}"
                   end
       end
@@ -384,29 +470,12 @@ module X11
       gc
     end
 
-    def put_image(*args)
-      write_request(X11::Form::PutImage.new(*args))
-    end
-
-    def clear_area(*args)
-      write_request(X11::Form::ClearArea.new(*args))
-    end
-
-    def copy_area(*args)
-      write_request(X11::Form::CopyArea.new(*args))
-    end
-
-    def image_text8(*args)
-      write_request(X11::Form::ImageText8.new(*args))
-    end
-
-    def image_text16(*args)
-      write_request(X11::Form::ImageText16.new(*args))
-    end
-
-    def poly_fill_rectangle(*args)
-      write_request(X11::Form::PolyFillRectangle.new(*args))
-    end
+    def put_image(*args)   = write_request(X11::Form::PutImage.new(*args))
+    def clear_area(*args)  = write_request(X11::Form::ClearArea.new(*args))
+    def copy_area(*args)   = write_request(X11::Form::CopyArea.new(*args))
+    def image_text8(*args) = write_request(X11::Form::ImageText8.new(*args))
+    def image_text16(*args)= write_request(X11::Form::ImageText16.new(*args))
+    def poly_fill_rectangle(*args) = write_request(X11::Form::PolyFillRectangle.new(*args))
 
     def create_pixmap(depth, drawable, w,h)
       pid = new_id

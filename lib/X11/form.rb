@@ -81,14 +81,14 @@ module X11
           when :unused
             sz = s.size.respond_to?(:call) ? s.size.call(self) : s.size
             "\x00" * sz
-          when :length
+          when :length, :format_length
             #p [s,value]
             #p [value.size]
             s.type_klass.pack(value.size)
           when :string
             s.type_klass.pack(value)
           when :list
-            value.collect do |obj|
+            Array(value).collect do |obj|
               if obj.is_a?(BaseForm)
                 obj.to_packet
               else
@@ -127,8 +127,17 @@ module X11
             when :length
               size = s.type_klass.unpack( socket.read(s.type_klass.size) )
               lengths[s.name] = size
+            when :format_length
+              size = s.type_klass.unpack( socket.read(s.type_klass.size) )
+              lengths[s.name] = case form.format
+                                when 8 then size
+                                when 16 then size*2
+                                when 32 then size*4
+                                else 0
+                                end
             when :string
-              val = s.type_klass.unpack(socket, lengths[s.name])
+              len = lengths[s.name]
+              val = s.type_klass.unpack(socket, len)
               form.instance_variable_set("@#{s.name}", val)
             when :list
               len = lengths[s.name]
@@ -177,12 +186,14 @@ module X11
         end
 
         def fields
-          super+Array(@structs).dup.delete_if{|s| s.type == :unused or s.type == :length }
+          super+Array(@structs).dup.delete_if{|s| s.type == :unused or s.type == :length or s.type == :format_length}
         end
       end
     end
 
+    AtomAtom=4
     CardinalAtom=6
+    WindowAtom=33
     
     ##
     ## X11 Packet Defintions
@@ -247,9 +258,9 @@ module X11
     end
 
     class DisplayInfo < BaseForm
-      field :release_number, Uint32
-      field :resource_id_base, Uint32
-      field :resource_id_mask, Uint32
+      field :release_number,     Uint32
+      field :resource_id_base,   Uint32
+      field :resource_id_mask,   Uint32
       field :motion_buffer_size, Uint32
       field :vendor, Uint16, :length
       field :maximum_request_length, Uint16
@@ -258,11 +269,11 @@ module X11
       field :image_byte_order, Signifigance
       field :bitmap_bit_order, Signifigance
       field :bitmap_format_scanline_unit, Uint8
-      field :bitmap_format_scanline_pad, Uint8
+      field :bitmap_format_scanline_pad,  Uint8
       field :min_keycode, KeyCode
       field :max_keycode, KeyCode
       unused 4
-      field :vendor, String8, :string
+      field :vendor,  String8,    :string
       field :formats, FormatInfo, :list
       field :screens, ScreenInfo, :list
     end
@@ -287,13 +298,13 @@ module X11
     # XRender structures
 
     class DirectFormat < BaseForm
-      field :red, Uint16
-      field :red_mask, Uint16
-      field :green, Uint16
+      field :red,        Uint16
+      field :red_mask,   Uint16
+      field :green,      Uint16
       field :green_mask, Uint16
-      field :blue, Uint16
-      field :blue_mask, Uint16
-      field :alpha, Uint16
+      field :blue,       Uint16
+      field :blue_mask,  Uint16
+      field :alpha,      Uint16
       field :alpha_mask, Uint16
     end
 
@@ -328,8 +339,8 @@ module X11
     # Requests
 
     CopyFromParent = 0
-    InputOutput = 1
-    InputOnly = 2
+    InputOutput    = 1
+    InputOnly      = 2
 
     CWBackPixmap  = 0x0001
     CWBackPixel   = 0x0002
@@ -337,23 +348,29 @@ module X11
     CWBorderPixel = 0x0008
     CWBitGravity  = 0x0010
     CWWinGravity  = 0x0020
-    CWBackingStore= 0x0040
-    CWSaveUnder   = 0x0400
-    CWEventMask   = 0x0800
-    CWColorMap    = 0x2000
+    CWBackingStore     = 0x0040
+    CWBackingPlanes    = 0x0080
+    CWBackingPixel     = 0x0100
+    CWOverrideRedirect = 0x0200
+    CWSaveUnder        = 0x0400
+    CWEventMask        = 0x0800
+    CWColorMap         = 0x2000
 
-    KeyPressMask           = 0x00001
-    KeyReleaseMask         = 0x00002
-    ButtonPressMask        = 0x00004
-    ButtonReleaseMask      = 0x00008
-    EnterWindowMask        = 0x00010
-    LeaveWindowMask        = 0x00020
-    PointerMotionMask      = 0x00040
-    PointerMotionHintMask  = 0x00080
-    Button1MotionMask      = 0x00100
-    ExposureMask           = 0x08000
-    StructureNotifyMask    = 0x20000
-    SubstructureNotifyMask = 0x80000
+    KeyPressMask           = 0x000001
+    KeyReleaseMask         = 0x000002
+    ButtonPressMask        = 0x000004
+    ButtonReleaseMask      = 0x000008
+    EnterWindowMask        = 0x000010
+    LeaveWindowMask        = 0x000020
+    PointerMotionMask      = 0x000040
+    PointerMotionHintMask  = 0x000080
+    Button1MotionMask      = 0x000100
+    ExposureMask           = 0x008000
+    StructureNotifyMask    = 0x020000
+    SubstructureNotifyMask = 0x080000
+    SubstructureRedirectMask=0x100000
+    FocusChangeMask        = 0x200000
+    PropertyChangeMask     = 0x400000
 
     class CreateWindow < BaseForm
       field :opcode, Uint8, value: 1
@@ -394,14 +411,14 @@ module X11
       field :sequence_number, Uint16
       field :reply_length, Uint32
       field :visual, VisualID
-      field :class, Uint16
+      field :wclass, Uint16
       field :bit_gravity, Uint8
       field :win_gravity, Uint8
       field :backing_planes, Uint32
       field :backing_pixel, Uint32
       field :save_under, Bool
       field :map_is_installed, Bool
-      field :map_state, Bool
+      field :map_state, Uint8
       field :override_redirect, Bool
       field :colormap, Colormap
       field :all_event_masks, Uint32
@@ -417,8 +434,32 @@ module X11
       field :window, Window
     end
 
+    class ChangeSaveSet < BaseForm
+      field :opcode, Uint8, value: 6
+      field :mode, Uint8
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+    
+    class ReparentWindow < BaseForm
+      field :opcode, Uint8, value: 7
+      unused 1
+      field :request_length, Uint16, value: 4
+      field :window, Window
+      field :parent, Window
+      field :x, Int16
+      field :y, Int16
+    end
+      
     class MapWindow < BaseForm
       field :opcode, Uint8, value: 8
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class UnmapWindow < BaseForm
+      field :opcode, Uint8, value: 10
       unused 1
       field :request_length, Uint16, value: 2
       field :window, Window
@@ -455,6 +496,25 @@ module X11
       unused 10
     end
 
+    class QueryTree < BaseForm
+      field :opcode, Uint8, value: 15
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class QueryTreeReply < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :root, Window
+      field :parent, Window
+      field :children, Uint16, :length
+      unused 14
+      field :children, Window, :list
+    end
+
     class InternAtom < BaseForm
       field :opcode, Uint8, value: 16
       field :only_if_exists, Bool
@@ -480,6 +540,22 @@ module X11
       unused 20
     end
 
+    class GetAtomName < BaseForm
+      field :opcode, Uint8, value: 17
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :atom, Atom
+    end
+
+    class AtomName < Reply
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :name, Uint16, :length
+      unused 22
+      field :name, String8, :string
+    end
+
     Replace = 0
     Prepend = 1
     Append = 2
@@ -496,10 +572,31 @@ module X11
       field :type, Atom
       field :format, Uint8
       unused 3
-      field :data, Uint32, value: ->(cp) {
-        cp.data.length / 4
-      }
+      field :data, Uint32, value: ->(cp) { cp.data.length / (cp.format/8) }
       field :data, Uint8, :list
+    end
+
+    class GetProperty < BaseForm
+      field :opcode, Uint8, value: 20
+      field :delete, Bool
+      field :request_length, Uint16, value: 6
+      field :window, Window
+      field :property, Atom
+      field :type, Atom
+      field :long_offset, Uint32
+      field :long_length, Uint32
+    end
+    
+    class Property < BaseForm
+      field :reply, Uint8, value: 1
+      field :format, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :type, Atom
+      field :bytes_after, Uint32
+      field :value, Uint32, :format_length
+      unused 12
+      field :value, String8, :string
     end
 
     class GrabButton < BaseForm
@@ -527,6 +624,18 @@ module X11
       field :pointer_mode, Uint8
       field :keyboard_mode, Uint8
       unused 3
+    end
+
+    class OpenFont < BaseForm
+      field :opcode, Uint8, value: 45
+      unused 1
+      field :request_length, Uint16, value: ->(of) {
+        3+(of.name.length+3)/4
+      }
+      field :fid, Font
+      field :name, Uint16, :length
+      unused 2
+      field :name, String8, :string
     end
     
     class ListFonts < BaseForm
@@ -618,11 +727,11 @@ module X11
       field :src_drawable, Drawable
       field :dst_drawable, Drawable
       field :gc, Gcontext
-      field :src_x, Uint16
-      field :src_y, Uint16
-      field :dst_x, Uint16
-      field :dst_y, Uint16
-      field :width, Uint16
+      field :src_x,  Uint16
+      field :src_y,  Uint16
+      field :dst_x,  Uint16
+      field :dst_y,  Uint16
+      field :width,  Uint16
       field :height, Uint16
     end
 
@@ -754,7 +863,7 @@ module X11
       field :sequence_number, Uint16
     end
 
-    class PressEvent < SimpleEvent
+    class InputEvent < SimpleEvent
       field :time, Uint32
       field :root, Window
       field :event, Window
@@ -764,6 +873,32 @@ module X11
       field :event_x, Int16
       field :event_y, Int16
       field :state, Uint16
+    end
+
+    class EnterLeaveNotify < InputEvent
+      field :mode, Uint8
+      field :same_screen_or_focus, Uint8
+
+      def same_screen = same_screen_or_focus.anybit?(0x02)
+      def focus = same_screen_or_focus.anybit?(0x01)
+    end
+
+    class EnterNotify < EnterLeaveNotify
+    end
+
+    class LeaveNotify < EnterLeaveNotify
+    end
+
+    class FocusIn < SimpleEvent
+      field :event, Window
+      field :mode, Uint8
+      unused 23
+    end
+
+    class FocusOut < FocusIn
+    end
+      
+    class PressEvent < InputEvent
       field :same_screen, Bool
       unused 1
     end
@@ -781,6 +916,31 @@ module X11
     end
 
     class ButtonRelease < PressEvent
+    end
+
+    class ReparentNotify < SimpleEvent
+      field :event, Window
+      field :window, Window
+      field :parent, Window
+      field :x, Int16
+      field :y, Int16
+      field :override_redirect, Bool
+      unused 11
+    end
+
+    class ConfigureRequest < Event # 23
+      field :stack_mode,      Uint8
+      field :sequence_number, Uint16
+      field :parent, Window
+      field :window, Window
+      field :sibling, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :border_width, Uint16
+      field :value_mask, Uint16
+      unused 4
     end
     
     class Expose < SimpleEvent
@@ -800,12 +960,49 @@ module X11
       unused 21
     end
 
+    class CreateNotify < SimpleEvent # 16
+      field :parent, Window
+      field :window, Window
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :border_width, Uint16
+      field :override_redirect, Bool
+    end
+    
+    class DestroyNotify < Event
+      unused 1
+      field :sequence_number, Uint16
+      field :event, Window
+      field :window, Window
+      unused 20
+    end
+    
+    class UnmapNotify < Event
+      unused 1
+      field :sequence_number, Uint16
+      field :event, Window
+      field :window, Window
+      field :from_configure, Bool
+      unused 19
+    end
+    
     class MapNotify < Event
       unused 1
       field :sequence_number, Uint16
       field :event, Window
+      field :window, Window
       field :override_redirect, Bool
       unused 19
+    end
+
+    class MapRequest < Event
+      unused 1
+      field :sequence_number, Uint16
+      field :parent, Window
+      field :window, Window
+      unused 20
     end
 
     class ConfigureNotify < Event
@@ -820,6 +1017,24 @@ module X11
       field :border_width, Uint16
       field :override_redirect, Bool
       unused 5
+    end
+
+    class ClientMessage < Event
+      field :format, Uint8
+      field :sequence_number, Uint16
+      field :window, Window
+      field :type, Atom
+      field :data, X11::Type::Message
+    end
+
+    class PropertyNotify < Event # 28
+      unused 1
+      field :sequence_number, Uint16
+      field :window, Window
+      field :atom, Atom
+      field :time, Uint32
+      field :state, Uint8
+      unused 15
     end
 
 
