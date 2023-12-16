@@ -13,37 +13,37 @@ require 'X11'
 dpy = display = X11::Display.new
 screen = dpy.screens.first
 root = screen.root
-wid = display.new_id
 
-dpy.create_window(
-  screen.root_depth, wid, root,
+wid = dpy.create_window(
   0, 0, # x,y
   1000, 600, # w,h
-  0,
-  X11::Form::InputOutput,
-  X11::Form::CopyFromParent,
-  X11::Form::CWBackPixel |
-    X11::Form::CWEventMask,
-  [0x0, # RGB background
-   X11::Form::SubstructureNotifyMask |
-   X11::Form::StructureNotifyMask    | ## Move
-   X11::Form::ExposureMask           |
-   X11::Form::KeyPressMask           |
-   X11::Form::ButtonPressMask
-  ]
+  # FIXME: WTH isn't depth: 32 working here?
+  depth: 24,
+  values: {
+    X11::Form::CWBackPixel => 0x0,
+    X11::Form::CWEventMask =>
+      (X11::Form::SubstructureNotifyMask |
+       X11::Form::StructureNotifyMask    | ## Move
+       X11::Form::ExposureMask           |
+       X11::Form::KeyPressMask           |
+       X11::Form::ButtonPressMask)
+   }
 )
+#dpy.next_packet
+#exit(0)
 
 def set_window_opacity(dpy, wid, opacity)
   dpy.change_property(
-    X11::Form::Replace,
-    wid, dpy.atom(:_NET_WM_WINDOW_OPACITY),
-    X11::Form::CardinalAtom, 32,
-    [(0xffffffff * opacity).to_i].pack("N").split(//).map(&:ord)
+    :replace,
+    wid, "_NET_WM_WINDOW_OPACITY",
+    :cardinal, 32,
+    [(0xffffffff * opacity).to_i].pack("V").unpack("C*")
   )
 end
 
 
 set_window_opacity(dpy, wid, 0.8)
+
 #p dpy.display_info
 
 #reply = dpy.query_extension("XKEYBOARD")
