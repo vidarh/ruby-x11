@@ -143,7 +143,7 @@ def render_glyph(display, wid, x,y, ch)
 #p img
 #  p ch
  display.put_image(
-    X11::Form::ZPixmap, wid, $gc2,
+    :ZPixmap, wid, $gc2,
     mtx.min_width,mtx.min_height,
     x, y - mtx.y_offset, 0, depth, data
   )
@@ -158,12 +158,12 @@ def render_str(display, wid, x,y, str)
 end
 
 def redraw(dpy, wid, gc)
-  dpy.poly_fill_rectangle(wid, gc, [X11::Form::Rectangle.new(20,20, 60, 80)])
+  dpy.poly_fill_rectangle(wid, gc, [20,20, 60, 80])
   dpy.clear_area(false, wid, 30, 30, 5, 5)
   dpy.image_text16(wid, $gc2, 30, 70, "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ")
   #"\u25f0\u25ef Hello World")
   dpy.put_image(
-    X11::Form::ZPixmap, wid, $gc2,
+    :ZPixmap, wid, $gc2,
     $png.width, $png.height, 80, 120, 0, 24, $data
   )
   render_str(dpy, wid, 30,90, 'HelloWorld')

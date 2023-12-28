@@ -116,7 +116,7 @@ module X11
       # FIXME: 30: SelectionRequest
       # FIXME: 31: SelectionNotify
       # FIXME: 32: ColormapNotify
-      when 33 then return Form::ClientMessage.from_packet(StringIO.new(data))
+      when 33 then return Form::ClientMessage.from_packet(io)
       # FIXME: 34: MappingNotify
       else
         STDERR.puts "FIXME: Event: #{type}"
@@ -165,11 +165,7 @@ module X11
     end
     
     def write_request ob
-      #p data
-      #p [:write_request, @requestseq, ob.class]
       data = ob.to_packet if ob.respond_to?(:to_packet)
-      #p [:AddGlyph,data] if ob.is_a?(X11::Form::XRenderAddGlyphs)
-      #p [ob.request_length.to_i*4, data.size]
       raise "BAD LENGTH for #{ob.inspect} (#{ob.request_length.to_i*4} ! #{data.size} " if ob.request_length && ob.request_length.to_i*4 != data.size
       write_raw_packet(data)
     end
@@ -252,24 +248,21 @@ module X11
       values = values.sort_by{_1[0]}
       mask =   values.inject(0) {|acc,v| (acc | v[0]) }
       values = values.map{_1[1]}
-      write_request(
-        X11::Form::ChangeWindowAttributes.new(wid, mask, values)
-      )
+      write_request(Form::ChangeWindowAttributes.new(wid, mask, values))
     end
 
     def select_input(w, events) = change_window_attributes(w, values: {Form::CWEventMask => events})
 
     def atom(name)
+      return name if name.is_a?(Integer) # Allow atom(atom_integer_or_symbol)
       name = name.to_sym
       intern_atom(false, name) if !@atoms[name]
       @atoms[name]
     end
 
     def query_extension(name)
-      r = write_sync(X11::Form::QueryExtension.new(name), X11::Form::QueryExtensionReply)
-      @extensions[name] = {
-        major: r.major_opcode
-      }
+      r = write_sync(Form::QueryExtension.new(name), Form::QueryExtensionReply)
+      @extensions[name] = { major: r.major_opcode }
       r
     end
 
@@ -282,38 +275,33 @@ module X11
     end
     
     def intern_atom(flag, name)
-      reply = write_sync(X11::Form::InternAtom.new(flag, name.to_s),
-      X11::Form::InternAtomReply)
+      reply = write_sync(Form::InternAtom.new(flag, name.to_s),Form::InternAtomReply)
       if reply
         @atoms[name.to_sym] = reply.atom
       end
     end
 
-    def get_atom_name(atom)
-      reply = write_sync(X11::Form::GetAtomName.new(atom), X11::Form::AtomName)
-      reply&.name
-    end
-
-    def destroy_window(window) = write_request(X11::Form::DestroyWindow.new(window))
-    def get_geometry(drawable) = write_sync(X11::Form::GetGeometry.new(drawable), X11::Form::Geometry)
+    def get_atom_name(atom)    = write_sync(Form::GetAtomName.new(atom), Form::AtomName)&.name
+    def destroy_window(window) = write_request(Form::DestroyWindow.new(window))
+    def get_geometry(drawable) = write_sync(Form::GetGeometry.new(drawable), Form::Geometry)
     
     def get_keyboard_mapping(min_keycode=display_info.min_keycode, count= display_info.max_keycode - min_keycode)
-      write_sync(X11::Form::GetKeyboardMapping.new(min_keycode, count), X11::Form::GetKeyboardMappingReply)
+      write_sync(Form::GetKeyboardMapping.new(min_keycode, count), Form::GetKeyboardMappingReply)
     end
 
     def create_colormap(alloc, window, visual)
       mid = new_id
-      write_request(X11::Form::CreateColormap.new(alloc, mid, window, visual))
+      write_request(Form::CreateColormap.new(alloc, mid, window, visual))
       mid
     end
 
     def get_property(window, property, type, offset: 0, length: 4, delete: false)
-      property = atom(property) if !property.is_a?(Integer)
+      property = atom(property)
       type     = atom_enum(type)
       
-      result = write_sync(X11::Form::GetProperty.new(
+      result = write_sync(Form::GetProperty.new(
         delete, window, property, type, offset, length
-      ), X11::Form::Property)
+      ), Form::Property)
 
       if result && result.format != 0
         case result.format
@@ -335,25 +323,22 @@ module X11
 
       mode = open_enum(mode, {replace: 0, prepend: 1, append: 2})
       type = atom_enum(type)
-      write_request(X11::Form::ChangeProperty.new(mode, window, property, type, format, data))
+      write_request(Form::ChangeProperty.new(mode, window, property, type, format, data))
     end
 
-    def list_fonts(*args)
-      write_sync(X11::Form::ListFonts.new(*args),
-        X11::Form::ListFontsReply)
-    end
-
-    def open_font(*args)    = write_request(X11::Form::OpenFont.new(*args))
-    def change_gc(*args)    = write_request(X11::Form::ChangeGC.new(*args))
-    def change_save_set(...)= write_request(X11::Form::ChangeSaveSet.new(...))
+    def list_fonts(...)     = write_sync(Form::ListFonts.new(...), Form::ListFontsReply)
+    def open_font(...)      = write_request(Form::OpenFont.new(...))
+    def change_gc(...)      = write_request(Form::ChangeGC.new(...))
+    def change_save_set(...)= write_request(Form::ChangeSaveSet.new(...))
+      
     def reparent_window(window, parent, x, y, save: true)
       # You so almost always want this that it should've been a single request
       change_save_set(0, window) if save
-      write_request(X11::Form::ReparentWindow.new(window, parent, x,y))
+      write_request(Form::ReparentWindow.new(window, parent, x,y))
     end
     
-    def map_window(*args)   = write_request(X11::Form::MapWindow.new(*args))
-    def unmap_window(*args) = write_request(X11::Form::UnmapWindow.new(*args))
+    def map_window(...)   = write_request(Form::MapWindow.new(...))
+    def unmap_window(...) = write_request(Form::UnmapWindow.new(...))
 
     def u8(*args)  = args.pack("c*")
     def u16(*args) = args.pack("v*")
@@ -375,9 +360,9 @@ module X11
       time      = open_enum(time,      {current_time: 0, now: 0})
       write_packet(u8(42,revert_to), u16(3), window(focus), u32(time))
     end
-      
+
     def grab_key(owner_events, grab_window, modifiers, keycode, pointer_mode, keyboard_mode)
-      write_request(X11::Form::GrabKey.new(
+      write_request(Form::GrabKey.new(
         owner_events,
         grab_window,
         modifiers,
@@ -389,7 +374,7 @@ module X11
 
     def grab_button(owner_events, grab_window, event_mask, pointer_mode,
       keyboard_mode, confine_to, cursor, button, modifiers)
-      write_request(X11::Form::GrabButton.new(
+      write_request(Form::GrabButton.new(
         owner_events, grab_window, event_mask,
         pointer_mode == :async ? 1 : 0,
         keyboard_mode == :async ? 1 : 0,
@@ -397,41 +382,27 @@ module X11
       )
     end
 
+    def set_value(values, mask, x)
+      if x
+        values << x
+        mask
+      else
+        0
+      end
+    end
+      
     def configure_window(window, x: nil, y: nil, width: nil, height: nil,
       border_width: nil, sibling: nil, stack_mode: nil)
 
       mask = 0
       values = []
 
-      if x
-        mask |= 0x001
-        values << x
-      end
-
-      if y
-        mask |= 0x002
-        values << y
-      end
-
-      if width
-        mask |= 0x004
-        values << width
-      end
-
-      if height
-        mask |= 0x008
-        values << height
-      end
-
-      if border_width
-        mask |= 0x010
-        values << border_width
-      end
-
-      if sibling
-        mask |= 0x020
-        values << sibling
-      end
+      mask |= set_value(values, 0x001, x)
+      mask |= set_value(values, 0x002, y)
+      mask |= set_value(values, 0x004, width)
+      mask |= set_value(values, 0x008, height)
+      mask |= set_value(values, 0x010, border_width)
+      mask |= set_value(values, 0x020, sibling)
 
       if stack_mode
         mask |= 0x040
@@ -455,15 +426,8 @@ module X11
       # FIXME:
       # The rest can be found here:
       # https://tronche.com/gui/x/xlib/GC/manipulating.html#XGCValues
-      if foreground
-        mask |= 0x04
-        args << foreground
-      end
-      if background
-        mask |= 0x08
-        args << background
-      end
-
+      mask |= set_value(args, 0x04, foreground)
+      mask |= set_value(args, 0x08, background)
       
       gc = new_id
       write_request(X11::Form::CreateGC.new(gc, window, mask, args))
@@ -475,12 +439,13 @@ module X11
     def copy_area(*args)   = write_request(X11::Form::CopyArea.new(*args))
     def image_text8(*args) = write_request(X11::Form::ImageText8.new(*args))
     def image_text16(*args)= write_request(X11::Form::ImageText16.new(*args))
-    def poly_fill_rectangle(*args) = write_request(X11::Form::PolyFillRectangle.new(*args))
+    def poly_fill_rectangle(wid, gc, *rects)
+      rects = rects.map{|r| r.is_a?(Array) ? Form::Rectangle.new(*r) : r}
+      write_request(X11::Form::PolyFillRectangle.new(wid, gc, rects))
+    end
 
     def create_pixmap(depth, drawable, w,h)
-      pid = new_id
-      write_request(X11::Form::CreatePixmap.new(depth, pid, drawable, w,h))
-      pid
+      new_id.tap{|pid| write_request(Form::CreatePixmap.new(depth, pid, drawable, w,h)) }
     end
 
     # XRender
@@ -506,8 +471,8 @@ module X11
 
     def render_query_pict_formats
       @render_formats ||= write_sync(
-        X11::Form::XRenderQueryPictFormats.new(render_opcode),
-        X11::Form::XRenderQueryPictFormatsReply
+        Form::XRenderQueryPictFormats.new(render_opcode),
+        Form::XRenderQueryPictFormatsReply
       )
     end
 
@@ -528,26 +493,26 @@ module X11
       case sym
       when :a8
         @a8 ||= formats.formats.find do |f|
-          f.type == 1 &&
+          f.type  == 1 &&
           f.depth == 8 &&
           f.direct.alpha_mask == 255
         end
       when :rgb24
         @rgb24 ||= formats.formats.find do |f|
-          f.type == 1 &&
-          f.depth == 24 &&
-          f.direct.red == 16 &&
+          f.type         == 1 &&
+          f.depth        == 24 &&
+          f.direct.red   == 16 &&
           f.direct.green == 8 &&
-          f.direct.blue == 0
+          f.direct.blue  == 0
         end
       when :argb24
         @argb24 ||= formats.formats.find do |f|
-          f.type == 1 &&
-          f.depth == 32 &&
+          f.type         == 1 &&
+          f.depth        == 32 &&
           f.direct.alpha == 24 &&
-          f.direct.red == 16 &&
+          f.direct.red   == 16 &&
           f.direct.green == 8 &&
-          f.direct.blue == 0
+          f.direct.blue  == 0
         end
       else
         raise "Unsupported format (a4/a1 by omission)"
