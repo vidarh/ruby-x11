@@ -58,7 +58,7 @@ module X11
 
     class String16
       def self.pack(x)
-        x.encode("UTF-16BE").force_encoding("ASCII-8BIT") + "\x00\x00"*(-x.length & 1)
+        x.encode("UTF-16BE").b + "\x00\x00"*(-x.length & 1)
       end
 
       def self.unpack(socket, size)
@@ -71,28 +71,14 @@ module X11
 
 
     class String8Unpadded
-      def self.pack(x)
-        x
-      end
-
-
-      def self.unpack(socket, size)
-        val = socket.read(size)
-      end
+      def self.pack(x) = x
+      def self.unpack(socket, size) = socket.read(size)
     end
-    
+      
     class Bool
-      def self.pack(x)
-        x ? "\x01" : "\x00"
-      end
-
-      def self.unpack(str)
-        str[0] == "\x01"
-      end
-
-      def self.size
-        1
-      end
+      def self.pack(x)     = (x ? "\x01" : "\x00")
+      def self.unpack(str) = (str[0] == "\x01")
+      def self.size = 1
     end
     
     KeyCode      = Uint8
