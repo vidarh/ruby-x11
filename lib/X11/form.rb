@@ -65,13 +65,6 @@ module X11
 
             if value.is_a?(BaseForm)
               v = value.to_packet
-            elsif value.is_a?(Symbol)
-              #if !@atoms[value]
-              #  reply = write_sync(X11::Forms::InternAtom.new(false, value.to_s), X11::Forms::InternAtomReply)
-              #  @
-              #end
-              #value = @atoms[value]
-              raise "FIXME"
             else
               #p [s,value]
               v = s.type_klass.pack(value)
