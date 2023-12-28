@@ -1,54 +1,50 @@
 # This module is used for encoding Ruby Objects to binary
 # data. The types Int8, Int16, etc. are data-types defined
-# in the X11 protocol. We wrap each data-type in a lambda expression
-# which gets evaluated when a packet is created.
+# in the X11 protocol.
 
 module X11
   module Type
 
-    def self.define(type, directive, bytesize)
-      eval %{
-        class X11::Type::#{type}
-          def self.pack(x)
-            [x].pack(\"#{directive}\")
-          end
+    class BaseType
+      @directive = nil
+      @bytesize = nil
 
-          def self.unpack(x)
-            x.unpack(\"#{directive}\").first
-          end
-
-          def self.size
-            #{bytesize}
-          end
-
-          def self.from_packet(sock)
-            r = sock.read(size)
-            r ? unpack(r) : nil
+      def self.config(d,b) = (@directive, @bytesize = d,b)
+        
+      def self.pack(x)
+        if x.is_a?(Symbol)
+          if (t = X11::Form.const_get(x)) && t.is_a?(Numeric)
+            x = t
           end
         end
-      }
+        [x].pack(@directive)
+      rescue TypeError => e
+        raise "Expected #{self.name}, got #{x.class} (value: #{x})"
+      end
+
+      def self.unpack(x) = x.nil? ? nil  : x.unpack1(@directive)
+      def self.size = @bytesize
+      def self.from_packet(sock) = unpack(sock.read(size))
     end
-
-    # Primitive Types
-    define "Int8", "c", 1
-    define "Int16", "s", 2
-    define "Int32", "l", 4
-    define "Uint8", "C", 1
-    define "Uint16", "S", 2
-    define "Uint32", "L", 4
     
-    define "Message", "c*", 20
-
+    # Primitive Types
+    class Int8   < BaseType; config("c",1); end
+    class Int16  < BaseType; config("s",2); end
+    class Int32  < BaseType; config("l",4); end
+    class Uint8  < BaseType; config("C",1); end
+    class Uint16 < BaseType; config("S",2); end
+    class Uint32 < BaseType; config("L",4); end
+    
     class Message
-      def self.pack(x) = x.b
+      def self.pack(x)   = x.b
       def self.unpack(x) = x.b
-      def self.size = 20
+      def self.size      = 20
       def self.from_packet(sock) = sock.read(2).b
     end
 
     class String8
       def self.pack(x)
-        x.force_encoding("ASCII-8BIT") + "\x00"*(-x.length & 3)
+        x.b + "\x00"*(-x.length & 3)
       end
 
       def self.unpack(socket, size)
