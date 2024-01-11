@@ -28,8 +28,7 @@ module X11
         family = :Internet
       end
 
-      # FIXME
-      authorize(host, family, display_id) rescue nil
+      authorize(host, family, display_id)
 
       @requestseq = 1
       @queue = []
