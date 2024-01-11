@@ -11,14 +11,14 @@ module X11
     AUTHENTICATE = 2
 
     ADDRESS_TYPES = {
-      256 => :Local,
+      0     => :Internet,
+      1     => :DECnet,
+      2     => :Chaos,
+      252   => :LocalHost,
+      253   => :Krb5Principal,
+      254   => :Netname,
+      256   => :Local,
       65535 => :Wild,
-      254 => :Netname,
-      253 => :Krb5Principal,
-      252 => :LocalHost,
-      0 => :Internet,
-      1 => :DECnet,
-      2 => :Chaos
     }
 
     AuthInfo = Struct.new :family, :address, :display, :auth_name, :auth_data
@@ -52,18 +52,15 @@ module X11
 
     # returns one entry from Xauthority file
     def read
-      auth_info = [] << ADDRESS_TYPES[ @file.read(2).unpack('n').first ]
+      auth_info = [] << ADDRESS_TYPES[ @file.read(2).unpack1('n') ]
 
       4.times do
-        length = @file.read(2).unpack('n').first
+        length = @file.read(2).unpack1('n')
         auth_info << @file.read(length)
       end
       AuthInfo[*auth_info]
     end
 
-    def reset
-      @file.seek(0, IO::SEEK_SET)
-    end
-
+    def reset = @file.seek(0, IO::SEEK_SET)
   end
 end
