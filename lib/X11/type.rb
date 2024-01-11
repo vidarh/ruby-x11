@@ -11,7 +11,7 @@ module X11
 
       def self.config(d,b) = (@directive, @bytesize = d,b)
         
-      def self.pack(x)
+      def self.pack(x, dpy)
         if x.is_a?(Symbol)
           if (t = X11::Form.const_get(x)) && t.is_a?(Numeric)
             x = t
@@ -27,7 +27,6 @@ module X11
       def self.from_packet(sock) = unpack(sock.read(size))
     end
     
-    # Primitive Types
     class Int8   < BaseType; config("c",1); end
     class Int16  < BaseType; config("s",2); end
     class Int32  < BaseType; config("l",4); end
@@ -36,16 +35,14 @@ module X11
     class Uint32 < BaseType; config("L",4); end
     
     class Message
-      def self.pack(x)   = x.b
-      def self.unpack(x) = x.b
-      def self.size      = 20
+      def self.pack(x,dpy) = x.b
+      def self.unpack(x)   = x.b
+      def self.size        = 20
       def self.from_packet(sock) = sock.read(2).b
     end
 
     class String8
-      def self.pack(x)
-        x.b + "\x00"*(-x.length & 3)
-      end
+      def self.pack(x, dpy) = (x.b + "\x00"*(-x.length & 3))
 
       def self.unpack(socket, size)
         raise "Expected size for String8" if size.nil?
@@ -57,7 +54,7 @@ module X11
     end
 
     class String16
-      def self.pack(x)
+      def self.pack(x, dpy)
         x.encode("UTF-16BE").b + "\x00\x00"*(-x.length & 1)
       end
 
@@ -71,13 +68,13 @@ module X11
 
 
     class String8Unpadded
-      def self.pack(x) = x
+      def self.pack(x,dpy) = x
       def self.unpack(socket, size) = socket.read(size)
     end
       
     class Bool
-      def self.pack(x)     = (x ? "\x01" : "\x00")
-      def self.unpack(str) = (str[0] == "\x01")
+      def self.pack(x, dpy) = (x ? "\x01" : "\x00")
+      def self.unpack(str)  = (str[0] == "\x01")
       def self.size = 1
     end
     
@@ -96,10 +93,16 @@ module X11
     Colormap     = Uint32
     Drawable     = Uint32
     Fontable     = Uint32
-    Atom         = Uint32
     VisualID     = Uint32
     Mask         = Uint32
     Timestamp    = Uint32
     Keysym       = Uint32
+
+    class Atom
+      def self.pack(x,dpy) = [dpy.atom(x)].pack("L")
+      def self.unpack(x)   = x.nil? ? nil : x.unpack1("L")
+      def self.size = 4
+      def self.from_packet(sock) = unpack(sock.read(size))
+    end
   end
 end

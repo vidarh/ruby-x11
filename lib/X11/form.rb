@@ -44,7 +44,7 @@ module X11
         end
       end
 
-      def to_packet
+      def to_packet(dpy)
         # fetch class level instance variable holding defined fields
         structs = self.class.structs
 
@@ -64,10 +64,10 @@ module X11
             #p [s,value]
 
             if value.is_a?(BaseForm)
-              v = value.to_packet
+              v = value.to_packet(dpy)
             else
               #p [s,value]
-              v = s.type_klass.pack(value)
+              v = s.type_klass.pack(value, dpy)
             end
             #p v
             v
@@ -77,15 +77,15 @@ module X11
           when :length, :format_length
             #p [s,value]
             #p [value.size]
-            s.type_klass.pack(value.size)
+            s.type_klass.pack(value.size, dpy)
           when :string
-            s.type_klass.pack(value)
+            s.type_klass.pack(value, dpy)
           when :list
             Array(value).collect do |obj|
               if obj.is_a?(BaseForm)
-                obj.to_packet
+                obj.to_packet(dpy)
               else
-                s.type_klass.pack(obj)
+                s.type_klass.pack(obj, dpy)
               end
             end
           end
