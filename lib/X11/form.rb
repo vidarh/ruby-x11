@@ -184,6 +184,29 @@ module X11
       end
     end
 
+    # # Predefined constants, that can be used in the form of symbols
+    
+    module Atoms
+      PRIMARY   = 1
+      SECONDARY = 2
+      ARC = 3
+      ATOM = 4
+      BITMAP = 5
+      CARDINAL = 6
+      COLORMAP = 7
+      CURSOR = 8
+      #...
+      STRING = 31
+      VISUALID = 32
+      WINDOW = 33
+      WM_COMMAND = 34
+      WM_HINTS = 35
+    end
+
+    PointerWindow = 0
+    InputFocus = 1
+    
+    # FIXME: Deprecated in favour of the Constants module
     AtomAtom=4
     CardinalAtom=6
     WindowAtom=33
@@ -286,6 +309,9 @@ module X11
       field :minor_opcode, Uint16
       field :major_opcode, Uint8
       unused 21
+
+      # The original request
+      attr_accessor :request
     end
 
     # XRender structures
@@ -329,8 +355,9 @@ module X11
       field :colormap, Colormap
     end
     
-    # Requests
+    # # Requests
 
+    # Constants, p112 onwards
     CopyFromParent = 0
     InputOutput    = 1
     InputOnly      = 2
@@ -358,12 +385,17 @@ module X11
     PointerMotionMask      = 0x000040
     PointerMotionHintMask  = 0x000080
     Button1MotionMask      = 0x000100
+    # 0x200 .. 0x40000; page 113
     ExposureMask           = 0x008000
+    VisibilityChangeMask   = 0x010000
     StructureNotifyMask    = 0x020000
+    ResizeRedirectMask     = 0x040000
     SubstructureNotifyMask = 0x080000
     SubstructureRedirectMask=0x100000
     FocusChangeMask        = 0x200000
     PropertyChangeMask     = 0x400000
+    ColormapChangeMask     = 0x800000
+    OwnerGrabButtonMask    = 0x100000
 
     class CreateWindow < BaseForm
       field :opcode, Uint8, value: 1
@@ -592,6 +624,15 @@ module X11
       field :value, String8, :string
     end
 
+    class SendEvent < BaseForm
+      field :opcode, Uint8, value: 25
+      field :propagate, Bool
+      field :request_length, Uint16, value: 11
+      field :destination, Window
+      field :event_mask, Uint32
+      field :event, Uint32 # FIXME: This is wrong, and will break on parsing.
+    end
+    
     class GrabButton < BaseForm
       field :opcode, Uint8, value: 28
       field :owner_events, Bool
@@ -678,6 +719,7 @@ module X11
     ForegroundMask = 0x04
     BackgroundMask = 0x08
     FontMask = 0x4000
+    GraphicsExposures = 0x10000
 
     class CreateGC < BaseForm
       field :opcode, Uint8, value: 55
@@ -1002,6 +1044,7 @@ module X11
       unused 1
       field :sequence_number, Uint16
       field :event, Window
+      field :window, Window
       field :above_sibling, Window
       field :x, Int16
       field :y, Int16

@@ -316,6 +316,12 @@ module X11
 
     def atom(name)
       return name if name.is_a?(Integer) # Allow atom(atom_integer_or_symbol)
+      begin
+        return Form::Atoms.const_get(name.to_sym) if Form::Atoms.const_defined?(name.to_sym)
+      rescue
+        # const_defined? will throw if name isn't a valid constant name, but
+        # that's fine
+      end
       name = name.to_sym
       intern_atom(false, name) if !@atoms[name]
       @atoms[name]
@@ -404,7 +410,10 @@ module X11
     def u8(*args)  = args.pack("c*")
     def u16(*args) = args.pack("v*")
     def u32(*args) = args.pack("V*")
-    def atom_enum(val) = open_enum(val, {cardinal: Form::CardinalAtom, atom: Form::AtomAtom, window: Form::WindowAtom})
+    def atom_enum(val)
+      open_enum(val, {cardinal: Form::CardinalAtom, atom: Form::AtomAtom, window: Form::WindowAtom}) || atom(val)
+    end
+    
     def window(*args)
       args.each {|a| raise "Window expected" if a.nil? }
       u32(*args)
@@ -415,7 +424,7 @@ module X11
     def set_input_focus(revert_to, focus, time=:now)
       # FIXME: This is an experiment.
       # Upside: Simpler. Downside: Doesn't work server-side.
-      # 
+      # Probably a bad idea.
       revert_to = open_enum(revert_to, {none: 0, pointer_root: 1, parent: 2})
       focus     = open_enum(focus,     {none: 0, pointer_root: 1 })
       time      = open_enum(time,      {current_time: 0, now: 0})
@@ -455,9 +464,8 @@ module X11
     def configure_window(window, x: nil, y: nil, width: nil, height: nil,
       border_width: nil, sibling: nil, stack_mode: nil)
 
-      mask = 0
       values = []
-
+      mask  = 0
       mask |= set_value(values, 0x001, x)
       mask |= set_value(values, 0x002, y)
       mask |= set_value(values, 0x004, width)
@@ -480,7 +488,9 @@ module X11
     end
 
 
-    def create_gc(window, foreground: nil, background: nil)
+    def create_gc(window, foreground: nil, background: nil,
+      graphics_exposures: nil
+    )
       mask = 0
       args = []
 
@@ -489,12 +499,27 @@ module X11
       # https://tronche.com/gui/x/xlib/GC/manipulating.html#XGCValues
       mask |= set_value(args, 0x04, foreground)
       mask |= set_value(args, 0x08, background)
+      mask |= set_value(args, 0x10000, graphics_exposures)
       
       gc = new_id
       write_request(X11::Form::CreateGC.new(gc, window, mask, args))
       gc
     end
 
+    def send_event(...) = write_request(Form::SendEvent.new(...))
+    def client_message(window: default_root, type: :ClientMessage, format: 32, destination: default_root, mask: 0, data: [], propagate: true)
+      f = {8 => "C20", 16 => "S10", 32 => "L5"}[format]
+      p f
+      data = (Array(data).map{|item|atom(item)} +[0]*20).pack(f)
+      event = Form::ClientMessage.new(
+        format, 0, window, atom(type), data
+      )
+      event.code =33
+      pp event
+        
+      send_event(propagate, destination, mask, event)
+    end
+      
     def put_image(*args)   = write_request(X11::Form::PutImage.new(*args))
     def clear_area(*args)  = write_request(X11::Form::ClearArea.new(*args))
     def copy_area(*args)   = write_request(X11::Form::CopyArea.new(*args))
@@ -560,19 +585,19 @@ module X11
         end
       when :rgb24
         @rgb24 ||= formats.formats.find do |f|
-          f.type         == 1 &&
+          f.type         == 1  &&
           f.depth        == 24 &&
           f.direct.red   == 16 &&
-          f.direct.green == 8 &&
+          f.direct.green == 8  &&
           f.direct.blue  == 0
         end
       when :argb24
         @argb24 ||= formats.formats.find do |f|
-          f.type         == 1 &&
+          f.type         == 1  &&
           f.depth        == 32 &&
           f.direct.alpha == 24 &&
           f.direct.red   == 16 &&
-          f.direct.green == 8 &&
+          f.direct.green == 8  &&
           f.direct.blue  == 0
         end
       else
