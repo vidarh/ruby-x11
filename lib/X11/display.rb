@@ -17,6 +17,8 @@ module X11
       host, display_id, screen_id = $1, $2, $3
       family = nil
 
+      @debug = ENV["PUREX_DEBUG"].to_s.strip == "true"
+      
       if host.empty?
         @socket = UNIXSocket.new("/tmp/.X11-unix/X#{display_id}")
         family = :Local
