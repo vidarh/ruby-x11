@@ -520,6 +520,8 @@ module X11
       send_event(propagate, destination, mask, event)
     end
       
+    def query_tree(...) = write_sync(X11::Form::QueryTree.new(...), X11::Form::QueryTreeReply)
+      
     def put_image(*args)   = write_request(X11::Form::PutImage.new(*args))
     def clear_area(*args)  = write_request(X11::Form::ClearArea.new(*args))
     def copy_area(*args)   = write_request(X11::Form::CopyArea.new(*args))
