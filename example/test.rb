@@ -14,7 +14,7 @@ dpy = display = X11::Display.new
 screen = dpy.screens.first
 root = screen.root
 
-wid = dpy.create_window(
+window = X11::Window.create(dpy, 
   0, 0, # x,y
   1000, 600, # w,h
   # FIXME: WTH isn't depth: 32 working here?
@@ -32,17 +32,18 @@ wid = dpy.create_window(
 #dpy.next_packet
 #exit(0)
 
-def set_window_opacity(dpy, wid, opacity)
-  dpy.change_property(
+
+def set_window_opacity(window, opacity)
+  window.change_property(
     :replace,
-    wid, "_NET_WM_WINDOW_OPACITY",
+    "_NET_WM_WINDOW_OPACITY",
     :cardinal, 32,
     [(0xffffffff * opacity).to_i].pack("V").unpack("C*")
   )
 end
 
 
-set_window_opacity(dpy, wid, 0.8)
+set_window_opacity(window, 0.8)
 
 #p dpy.display_info
 
@@ -87,11 +88,11 @@ def lookup_keysym(dpy,  event)
 end
 
 puts "Mapping"
-dpy.map_window(wid)
+window.map
 
-$gc = gc = dpy.create_gc(wid, foreground: 0xff0000)
-$gc2 = dpy.create_gc(wid,foreground: 0xffffff, background: 0x444444)
-$gc3 = dpy.create_gc(wid)
+$gc = gc = window.create_gc(foreground: 0xff0000)
+$gc2 = window.create_gc(foreground: 0xffffff, background: 0x444444)
+$gc3 = window.create_gc
 
 
 puts "Main loop"
@@ -123,7 +124,7 @@ $sft = SFT.new($f)
 $sft.x_scale = 15
 $sft.y_scale = 15
 $glyphcache = {}
-def render_glyph(display, wid, x,y, ch)
+def render_glyph(window, x,y, ch)
   gid = $sft.lookup(ch.ord)
   mtx = $sft.gmetrics(gid)
   data = $glyphcache[gid]
@@ -135,45 +136,45 @@ def render_glyph(display, wid, x,y, ch)
  #   p img
     data = img.pixels.map {|px|
       "\0\0"+px.chr+"\0" #+ "\0\0\0"
-    }.join.force_encoding("ASCII-8BIT")
+    }.join.b
     $glyphcache[gid] = data
   end
   depth = 24
 #  p data
 #p img
 #  p ch
- display.put_image(
-    :ZPixmap, wid, $gc2,
+   window.put_image(
+    :ZPixmap, $gc2,
     mtx.min_width,mtx.min_height,
     x, y - mtx.y_offset, 0, depth, data
   )
   mtx.advance_width
 end
 
-def render_str(display, wid, x,y, str)
+def render_str(window, x,y, str)
   str.each_byte do |ch|
-    off = render_glyph(display, wid, x, y, ch.chr)
+    off = render_glyph(window, x, y, ch.chr)
     x+= off
   end
 end
 
-def redraw(dpy, wid, gc)
-  dpy.poly_fill_rectangle(wid, gc, [20,20, 60, 80])
-  dpy.clear_area(false, wid, 30, 30, 5, 5)
-  dpy.image_text16(wid, $gc2, 30, 70, "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ")
+def redraw(window, gc)
+  window.poly_fill_rectangle(gc, [20,20, 60, 80])
+  window.clear_area(false, 30, 30, 5, 5)
+  window.image_text16($gc2, 30, 70, "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ")
   #"\u25f0\u25ef Hello World")
-  dpy.put_image(
-    :ZPixmap, wid, $gc2,
+  window.put_image(
+    :ZPixmap, $gc2,
     $png.width, $png.height, 80, 120, 0, 24, $data
   )
-  render_str(dpy, wid, 30,90, 'HelloWorld')
+  render_str(window, 30,90, 'HelloWorld')
 end
 
 loop do
   pkt = display.next_packet
   if pkt
     p pkt
-    redraw(display, wid, gc) if pkt.is_a?(X11::Form::Expose)
+    redraw(window, gc) if pkt.is_a?(X11::Form::Expose)
 
     if pkt.is_a?(X11::Form::KeyPress)
       lookup_keysym(dpy,pkt)
