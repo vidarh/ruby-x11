@@ -1,5 +1,5 @@
 module X11
-  class X11Error < StandardError; end
+  class BasicError < StandardError; end
 end
 
 require 'socket'

@@ -3,10 +3,16 @@ require 'stringio'
 
 module X11
 
-  class DisplayError < X11Error; end
-  class ConnectionError < X11Error; end
-  class AuthorizationError < X11Error; end
-  class ProtocolError < X11Error; end
+  class DisplayError < X11::BasicError; end
+  class ConnectionError < X11::BasicError; end
+  class AuthorizationError < X11::BasicError; end
+  class ProtocolError < X11::BasicError; end
+  class Error < X11::BasicError
+    def initialize(pkt)
+      super("Error: #{pkt.error}, code=#{pkt.code}, seq=#{pkt.sequence_number}, resource=#{pkt.bad_resource_id}, major=#{pkt.major_opcode}, minor=#{pkt.minor_opcode}")
+      @error = pkt
+    end
+  end
 
   class Display
     attr_accessor :socket
@@ -189,7 +195,7 @@ module X11
       STDERR.puts "write_sync_req: #{ob.inspect}" if @debug
       pkt = q.shift
       STDERR.puts "write_sync_rep: #{pkt.inspect}" if @debug
-      raise(pkt) if pkt.is_a?(X11::Form::Error)
+      raise(X11::Error.new(pkt)) if pkt.is_a?(X11::Form::Error)
       return pkt if !pkt.is_a?(String)
       reply ? reply.from_packet(StringIO.new(pkt)) : pkt
     end
