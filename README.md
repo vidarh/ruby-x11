@@ -9,6 +9,16 @@ upstread everything.
 This library is based off of Mathieu Bouchard's work on his RubyX11 project,
 and Richard Ramsdens excellent start on Ruby-X11.
 
+Current known use (all mine...):
+
+ * [RubyWM](https://github.com/vidarh/rubywm) - Pure Ruby window manager
+ * [Skrift-X11](https://github.com/vidarh/skrift-x11) - X11 integration for pure Ruby Truetype font rendering
+ * Rebar - not yet published wm toolbar
+ * RubyTerm (name TBD) - not yet published version of Ruby terminal
+
+If you're thinking of using pure-x11, drop me a note and I'll start being more
+cautious about breaking changes ;)
+
 Contributors
 ------------
 
