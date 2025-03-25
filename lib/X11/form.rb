@@ -882,18 +882,18 @@ module X11
     # FIXME: Events have quite a bit of redundancy, but unfortunately
     # BaseForm can't handle subclassing well.
 
-    Shift = 0x001
-    Lock  = 0x002
-    Control = 0x004
-    Mod1 = 0x008
-    Mod2 = 0x010
-    Mod3 = 0x0020
-    Mod4 = 0x0040
-    Mod5 = 0x0080
-    Button1 = 0x100
-    Button2 = 0x200
-    Button3 = 0x400
-    Button4 = 0x800
+    Shift   = 0x0001
+    Lock    = 0x0002
+    Control = 0x0004
+    Mod1    = 0x0008
+    Mod2    = 0x0010
+    Mod3    = 0x0020
+    Mod4    = 0x0040
+    Mod5    = 0x0080
+    Button1 = 0x0100
+    Button2 = 0x0200
+    Button3 = 0x0400
+    Button4 = 0x0800
     Button5 = 0x1000
 
     class Event < BaseForm
