@@ -694,6 +694,13 @@ module X11
       field :width, Uint16
       field :height, Uint16
     end
+    
+    class FreePixmap < BaseForm
+      field :opcode, Uint8, value: 54
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :pixmap, Pixmap
+    end
 
     class Str < BaseForm
       field :name, Uint8, :length, value: ->(str) { str.name.length }
@@ -1216,6 +1223,13 @@ module X11
        field :request_length, Uint16, value: 4
        field :fill, Uint32
        field :color, XRenderColor
+     end
+
+     class XRenderFreePicture < BaseForm
+       field :req_type, Uint8
+       field :render_req_type, Uint8, value: 7
+       field :request_length, Uint16, value: 2
+       field :picture, Uint32
      end
   end
 end

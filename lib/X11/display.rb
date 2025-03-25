@@ -541,6 +541,10 @@ module X11
     def create_pixmap(depth, drawable, w,h)
       new_id.tap{|pid| write_request(Form::CreatePixmap.new(depth, pid, drawable, w,h)) }
     end
+    
+    def free_pixmap(pixmap)
+      write_request(Form::FreePixmap.new(pixmap))
+    end
 
     # XRender
 
@@ -650,6 +654,10 @@ module X11
       fill = new_id
       write_request(Form::XRenderCreateSolidFill.new(render_opcode,fill,color))
       fill
+    end
+    
+    def render_free_picture(picture)
+      write_request(Form::XRenderFreePicture.new(render_opcode, picture))
     end
 
     private
