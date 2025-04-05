@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    pure-x11 (0.0.8)
+    pure-x11 (0.0.12)
 
 GEM
   remote: https://rubygems.org/

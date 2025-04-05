@@ -659,6 +659,10 @@ module X11
     def render_free_picture(picture)
       write_request(Form::XRenderFreePicture.new(render_opcode, picture))
     end
+    
+    def query_pointer(window)
+      write_sync(Form::QueryPointer.new(window), Form::QueryPointerReply)
+    end
 
     private
 

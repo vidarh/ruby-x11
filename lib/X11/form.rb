@@ -215,6 +215,10 @@ module X11
     ## X11 Packet Defintions
     ##
 
+    class Reply < BaseForm
+      field :reply, Uint8
+    end
+
     class ClientHandshake < BaseForm
       field :byte_order, Uint8
       unused 1
@@ -458,6 +462,27 @@ module X11
       field :request_length, Uint16, value: 2
       field :window, Window
     end
+    
+    class QueryPointer < BaseForm
+      field :opcode, Uint8, value: 38
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+    
+    class QueryPointerReply < Reply
+      field :same_screen, Bool
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :root, Window
+      field :child, Window
+      field :root_x, Int16
+      field :root_y, Int16
+      field :win_x, Int16
+      field :win_y, Int16
+      field :mask, Uint16
+      unused 6
+    end
 
     class ChangeSaveSet < BaseForm
       field :opcode, Uint8, value: 6
@@ -551,10 +576,6 @@ module X11
       }
       unused 2
       field :name, String8, :string
-    end
-
-    class Reply < BaseForm
-      field :reply, Uint8
     end
 
     class InternAtomReply < Reply
