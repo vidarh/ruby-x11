@@ -18,7 +18,7 @@ module X11
           end
         end
         [x].pack(@directive)
-      rescue TypeError => e
+      rescue TypeError
         raise "Expected #{self.name}, got #{x.class} (value: #{x})"
       end
 

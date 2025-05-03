@@ -48,7 +48,7 @@ module X11
         # fetch class level instance variable holding defined fields
         structs = self.class.structs
 
-        packet = structs.map do |s|
+        structs.map do |s|
           # fetch value of field set in initialization
 
           value = s.type == :unused ? nil : instance_variable_get("@#{s.name}")
@@ -404,7 +404,7 @@ module X11
     class CreateWindow < BaseForm
       field :opcode, Uint8, value: 1
       field :depth,  Uint8
-      field :request_length, Uint16, value: ->(cw) { len = 8 + cw.value_list.length }
+      field :request_length, Uint16, value: ->(cw) { 8 + cw.value_list.length }
       field :wid, Window
       field :parent, Window
       field :x, Int16
@@ -753,7 +753,7 @@ module X11
       field :opcode, Uint8, value: 55
       unused 1
       field :request_length, Uint16, value: ->(cw) {
-        len = 4 + cw.value_list.length
+        4 + cw.value_list.length
       }
       field :cid, Gcontext
       field :drawable, Drawable
@@ -802,7 +802,7 @@ module X11
       field :opcode, Uint8, value: 70
       unused 1
       field :request_length, Uint16, value: ->(ob) {
-        len = 3 + 2*(Array(ob.rectangles).length)
+        3 + 2*(Array(ob.rectangles).length)
       }
       field :drawable, Drawable
       field :gc, Uint32
@@ -1140,7 +1140,7 @@ module X11
       field :formats, PictFormInfo, :list
       field :screens, PictScreen, :list
       field :subpixels, Uint32, :list
-     end
+    end
 
      class XRenderCreatePicture < BaseForm
        field :req_type, Uint8

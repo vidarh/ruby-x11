@@ -20,7 +20,7 @@ module X11
     # Open a connection to the specified display (numbered from 0) on the specified host
     def initialize(target = ENV['DISPLAY'])
       target =~ /^([\w.-]*):(\d+)(?:.(\d+))?$/
-      host, display_id, screen_id = $1, $2, $3
+      host, display_id, _screen_id = $1, $2, $3
       family = nil
 
       @debug = ENV["PUREX_DEBUG"].to_s.strip == "true"
@@ -515,8 +515,8 @@ module X11
     def send_event(...) = write_request(Form::SendEvent.new(...))
     def client_message(window: default_root, type: :ClientMessage, format: 32, destination: default_root, mask: 0, data: [], propagate: true)
       f = {8 => "C20", 16 => "S10", 32 => "L5"}[format]
-      p f
-      data = (Array(data).map{|item|atom(item)} +[0]*20).pack(f)
+      # p f
+      data = (Array(data).map{|item|atom(item)} + [0]*20).pack(f)
       event = Form::ClientMessage.new(
         format, 0, window, atom(type), data
       )

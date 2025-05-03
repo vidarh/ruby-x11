@@ -36,7 +36,7 @@ module X11
     # If no data is found, returns nil
     def get_by_hostname(host, family, display_id)
       host = `hostname`.chomp if host == 'localhost' or host == '127.0.0.1' or host.nil?
-      address = TCPSocket.gethostbyname(host) if family == :Internet # this line does nothing for now
+      # address = TCPSocket.gethostbyname(host) if family == :Internet # this line does nothing for now
 
       auth_data = nil
 
