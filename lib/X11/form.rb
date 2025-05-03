@@ -158,7 +158,7 @@ module X11
           class_eval do
             if value && value.respond_to?(:call)
               define_method(name.to_sym) { value.call(self) }
-            else
+            elsif type != :length && type != :format_length
               attr_accessor name
             end
           end
