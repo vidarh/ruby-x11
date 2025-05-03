@@ -50,12 +50,14 @@ describe X11::Form::BaseForm do
     parent.children << Child.new
     parent.children << Child.new
 
-    assert_equal parent.children.size, 2
+    _(parent.children.size).must_equal 2
   end
 
   it "should encode/decode a packet" do
     parent = Parent.new(255,Point.new(23,17), "Parent Form", [])
-    socket = MockSocket.new(parent.to_packet)
+    # Create a mock display object to pass to to_packet
+    mock_display = Object.new
+    socket = MockSocket.new(parent.to_packet(mock_display))
 
     decoded = Parent.from_packet(socket)
     _(decoded.value).must_equal 255

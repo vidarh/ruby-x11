@@ -9,7 +9,7 @@ describe X11 do
     it "should generate a unique id" do
       collection = 1000.times.collect { @display.new_id }
       expected = collection.size
-      collection.uniq.size.must_equal expected
+      _(collection.uniq.size).must_equal expected
     end
   end
 end
