@@ -1252,5 +1252,60 @@ module X11
        field :request_length, Uint16, value: 2
        field :picture, Uint32
      end
+     
+     # Xinerama extension
+     # From https://gitlab.freedesktop.org/xorg/proto/xineramaproto/-/blob/master/panoramiXproto.h
+     class XineramaQueryVersion < BaseForm
+       field :req_type, Uint8
+       field :xinerama_req_type, Uint8, value: 0
+       field :request_length, Uint16, value: 2
+       field :major_version, Uint16, value: 1
+       field :minor_version, Uint16, value: 0
+     end
+
+     class XineramaQueryVersionReply < Reply
+       unused 1
+       field :sequence_number, Uint16
+       field :reply_length, Uint32
+       field :major_version, Uint16
+       field :minor_version, Uint16
+       unused 20
+     end
+
+     class XineramaIsActive < BaseForm
+       field :req_type, Uint8
+       field :xinerama_req_type, Uint8, value: 4
+       field :request_length, Uint16, value: 1
+     end
+
+     class XineramaIsActiveReply < Reply
+       unused 1
+       field :sequence_number, Uint16
+       field :reply_length, Uint32
+       field :state, Uint32
+       unused 20
+     end
+
+     class XineramaScreenInfo < BaseForm
+       field :x_org, Int16
+       field :y_org, Int16
+       field :width, Uint16
+       field :height, Uint16
+     end
+
+     class XineramaQueryScreens < BaseForm
+       field :req_type, Uint8
+       field :xinerama_req_type, Uint8, value: 5
+       field :request_length, Uint16, value: 1
+     end
+
+     class XineramaQueryScreensReply < Reply
+       unused 1
+       field :sequence_number, Uint16
+       field :reply_length, Uint32
+       field :screens, Uint32, :length
+       unused 20
+       field :screens, XineramaScreenInfo, :list
+     end
   end
 end
