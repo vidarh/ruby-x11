@@ -660,6 +660,37 @@ module X11
       write_request(Form::XRenderFreePicture.new(render_opcode, picture))
     end
     
+    # Xinerama extension
+    
+    def xinerama_opcode
+      return @xinerama_opcode if @xinerama_opcode
+      @xinerama_opcode = major_opcode("XINERAMA")
+      @xinerama_opcode
+    end
+    
+    def xinerama_query_version
+      return @xinerama_version if @xinerama_version
+      @xinerama_version = write_sync(
+        X11::Form::XineramaQueryVersion.new(xinerama_opcode),
+        X11::Form::XineramaQueryVersionReply
+      )
+    end
+    
+    def xinerama_is_active
+      result = write_sync(
+        X11::Form::XineramaIsActive.new(xinerama_opcode),
+        X11::Form::XineramaIsActiveReply
+      )
+      result.state != 0
+    end
+    
+    def xinerama_query_screens
+      write_sync(
+        X11::Form::XineramaQueryScreens.new(xinerama_opcode),
+        X11::Form::XineramaQueryScreensReply
+      )
+    end
+    
     def query_pointer(window)
       write_sync(Form::QueryPointer.new(window), Form::QueryPointerReply)
     end
