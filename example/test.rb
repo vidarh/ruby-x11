@@ -73,7 +73,8 @@ def update_keymap(dpy)
         (c-0x01000100).
         chr(Encoding::UTF_32) rescue c.to_s(16)
       else
-        raise "unknown_#{c.to_s(16)}"
+        #raise "unknown_#{c.to_s(16)}"
+        STDERR.puts "UNKNOWN: #{c.to_s(16)}"
       end
     end.each_slice(reply.keysyms_per_keycode).to_a
     #ks = ks.map {|s| s.compact.sort_by{|x| x.to_s}.uniq }.to_a # This is for testing/ease of reading only
