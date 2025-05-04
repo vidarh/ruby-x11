@@ -371,19 +371,20 @@ module X11
     def get_property(window, property, type, offset: 0, length: 4, delete: false)
       property = atom(property)
       type     = atom_enum(type)
+      window_id = window.is_a?(X11::Window) ? window.wid : window
       
       result = write_sync(Form::GetProperty.new(
-        delete, window, property, type, offset, length
+        delete, window_id, property, type, offset, length
       ), Form::Property)
 
       if result && result.format != 0
         case result.format
         when 16
-          result.value = result.value.unpack("v")
-          result.value = result.value.first if length == 2
+          result.value = result.value.unpack("v*")
+          result.value = result.value.first if result.value.length == 1
         when 32
-          result.value = result.value.unpack("V")
-          result.value = result.value.first if length == 4
+          result.value = result.value.unpack("V*")
+          result.value = result.value.first if result.value.length == 1
         end
       elsif result
         result.value = nil
@@ -393,10 +394,11 @@ module X11
     
     def change_property(mode, window, property, type, format, data)
       property = atom(property.to_sym) if property.is_a?(Symbol) || property.is_a?(String)
+      window_id = window.is_a?(X11::Window) ? window.wid : window
 
       mode = open_enum(mode, {replace: 0, prepend: 1, append: 2})
       type = atom_enum(type)
-      write_request(Form::ChangeProperty.new(mode, window, property, type, format, data))
+      write_request(Form::ChangeProperty.new(mode, window_id, property, type, format, data))
     end
 
     def list_fonts(...)     = write_sync(Form::ListFonts.new(...), Form::ListFontsReply)
