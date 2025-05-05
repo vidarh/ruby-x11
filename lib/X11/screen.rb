@@ -15,7 +15,7 @@ module X11
     def black_pixel = @internal.black_pixel
     def white_pixel = @internal.white_pixel
 
-    def to_s
+    def inspect
       "#<X11::Screen(#{id}) width=#{width} height=#{height}>"
     end
   end
