@@ -358,6 +358,41 @@ module X11
     def destroy_window(window) = write_request(Form::DestroyWindow.new(window))
     def get_geometry(drawable) = write_sync(Form::GetGeometry.new(drawable), Form::Geometry)
     
+    # Set the owner of a selection
+    # selection: the selection atom
+    # owner: the window ID of the new owner, or None (0) to indicate no owner
+    # time: the server time when ownership should take effect, or CurrentTime (0)
+    def set_selection_owner(selection, owner, time = 0)
+      # Convert selection to atom ID if necessary
+      selection = atom(selection) if selection.is_a?(Symbol) || selection.is_a?(String)
+      owner = owner || 0  # Allow nil for owner to mean None (0)
+      
+      # Create and send the SetSelectionOwner request using the Form
+      req = Form::SetSelectionOwner.new(owner, selection, time)
+      write_request(req)
+      
+      true # Always returns true; check get_selection_owner to verify
+    end
+    
+    # Get the current owner of a selection
+    # selection: the selection atom
+    # Returns: the window ID of the owner, or None (0) if there is no owner
+    def get_selection_owner(selection)
+      # Convert selection to atom ID if necessary
+      selection = atom(selection) if selection.is_a?(Symbol) || selection.is_a?(String)
+      
+      # Use the form-based approach for reading
+      req = Form::GetSelectionOwner.new(selection)
+      
+      begin
+        reply = write_sync(req, Form::SelectionOwner)
+        reply ? reply.owner : 0
+      rescue => e
+        STDERR.puts "Error getting selection owner: #{e.message}" if @debug
+        0  # Return 0 (None) on error
+      end
+    end
+    
     def get_keyboard_mapping(min_keycode=display_info.min_keycode, count= display_info.max_keycode - min_keycode)
       write_sync(Form::GetKeyboardMapping.new(min_keycode, count), Form::GetKeyboardMappingReply)
     end

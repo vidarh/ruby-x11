@@ -654,6 +654,30 @@ module X11
       field :event, Uint32 # FIXME: This is wrong, and will break on parsing.
     end
     
+    class SetSelectionOwner < BaseForm
+      field :opcode, Uint8, value: 22
+      unused 1
+      field :request_length, Uint16, value: 4
+      field :owner, Window      # Window - NOTE: order corrected, owner comes first
+      field :selection, Atom    # Selection atom
+      field :time, Uint32
+    end
+    
+    class GetSelectionOwner < BaseForm
+      field :opcode, Uint8, value: 23
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :selection, Atom    # Selection atom
+    end
+    
+    class SelectionOwner < Reply
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :owner, Window
+      unused 20
+    end
+    
     class GrabButton < BaseForm
       field :opcode, Uint8, value: 28
       field :owner_events, Bool
