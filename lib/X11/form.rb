@@ -634,6 +634,10 @@ module X11
       unused 3
       field :data, Uint32, value: ->(cp) { cp.data.length / (cp.format/8) }
       field :data, Uint8, :list
+      # The protocol pads the data to a 4-byte boundary; request_length already
+      # accounts for it, so emit the pad bytes (otherwise format-8/16 data whose
+      # length isn't a multiple of 4 produces a short packet).
+      unused ->(cp) { (4 - cp.data.length % 4) % 4 }
     end
 
     class GetProperty < BaseForm
