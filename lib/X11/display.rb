@@ -495,6 +495,22 @@ module X11
       )
     end
 
+    # Actively grab the keyboard for grab_window. Returns the reply (status 0 =
+    # Success). Modes default to async so key events flow normally to the focus.
+    def grab_keyboard(grab_window, owner_events: true, pointer_mode: :async,
+      keyboard_mode: :async, time: 0)
+      write_sync(Form::GrabKeyboard.new(
+        owner_events ? 1 : 0,
+        grab_window, time,
+        pointer_mode  == :async ? 1 : 0,
+        keyboard_mode == :async ? 1 : 0
+      ), Form::GrabKeyboardReply)
+    end
+
+    def ungrab_keyboard(time = 0)
+      write_request(Form::UngrabKeyboard.new(time))
+    end
+
     def set_value(values, mask, x)
       if x
         values << x

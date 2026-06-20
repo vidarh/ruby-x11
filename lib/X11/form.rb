@@ -723,6 +723,31 @@ module X11
       unused 3
     end
 
+    class GrabKeyboard < BaseForm
+      field :opcode, Uint8, value: 31
+      field :owner_events, Bool
+      field :request_length, Uint16, value: 4
+      field :grab_window, Window
+      field :time, Uint32
+      field :pointer_mode, Uint8
+      field :keyboard_mode, Uint8
+      unused 2
+    end
+
+    class GrabKeyboardReply < Reply
+      field :status, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      unused 24
+    end
+
+    class UngrabKeyboard < BaseForm
+      field :opcode, Uint8, value: 32
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :time, Uint32
+    end
+
     class OpenFont < BaseForm
       field :opcode, Uint8, value: 45
       unused 1

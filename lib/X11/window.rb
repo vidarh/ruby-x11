@@ -24,6 +24,8 @@ module X11
     def get_property(...)          = dpy.get_property(@wid,...)
     def grab_key(arg, ...)         = dpy.grab_key(arg, @wid, ...)
     def grab_button(arg,...)       = dpy.grab_button(arg, @wid, ...)
+    def grab_keyboard(...)         = dpy.grab_keyboard(@wid, ...)
+    def ungrab_keyboard(...)       = dpy.ungrab_keyboard(...)
     def change_property(mode, ...) = dpy.change_property(mode, @wid, ...)
     def set_input_focus(mode)      = dpy.set_input_focus(mode, @wid)
     def select_input(...)          = dpy.select_input(@wid,...)
