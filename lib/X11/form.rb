@@ -484,6 +484,20 @@ module X11
       unused 6
     end
 
+    class GetInputFocus < BaseForm
+      field :opcode, Uint8, value: 43
+      unused 1
+      field :request_length, Uint16, value: 1
+    end
+    
+    class GetInputFocusReply < Reply
+      field :revert_to, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :focus, Window
+      unused 20
+    end
+
     class ChangeSaveSet < BaseForm
       field :opcode, Uint8, value: 6
       field :mode, Uint8

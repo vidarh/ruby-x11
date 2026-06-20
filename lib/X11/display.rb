@@ -732,6 +732,10 @@ module X11
       write_sync(Form::QueryPointer.new(window), Form::QueryPointerReply)
     end
 
+    def get_input_focus
+      write_sync(Form::GetInputFocus.new, Form::GetInputFocusReply)
+    end
+
     private
 
     def authorize(host, family, display_id)
