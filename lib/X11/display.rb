@@ -19,6 +19,10 @@ module X11
 
     # Open a connection to the specified display (numbered from 0) on the specified host
     def initialize(target = ENV['DISPLAY'])
+      # With no DISPLAY set (nil or empty), fall back to the conventional
+      # default display ":0" rather than letting the regex below leave host
+      # nil and crash on host.empty?.
+      target = ":0" if target.nil? || target.empty?
       target =~ /^([\w.-]*):(\d+)(?:.(\d+))?$/
       host, display_id, _screen_id = $1, $2, $3
       family = nil
