@@ -15,6 +15,9 @@ module X11
     class << self
       def requests_by_opcode
         @requests_by_opcode ||= constants.each_with_object({}) do |c, h|
+          # *Header forms are server-side partial decoders for variable-data
+          # requests; the full form owns the opcode in the registry.
+          next if c.to_s.end_with?("Header")
           k = const_get(c)
           next unless k.is_a?(Class) && k.respond_to?(:structs)
           op = k.structs.find { |s| s.name == :opcode && s.value.is_a?(Integer) }

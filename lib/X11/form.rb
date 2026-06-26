@@ -54,6 +54,12 @@ module X11
       # to_packet just threads it to the types, which branch on its class.
       def encode(ctx) = to_packet(ctx)
 
+      # Hash-style field access alongside the attr accessors.
+      def [](name) = instance_variable_get("@#{name}")
+      def []=(name, value)
+        instance_variable_set("@#{name}", value)
+      end
+
       def to_packet(dpy)
         # fetch class level instance variable holding defined fields
         structs = self.class.structs
@@ -107,10 +113,14 @@ module X11
           superclass.structs + Array(@structs) #instance_variable_get("@structs"))
         end
 
-        # Decode from a byte buffer with an explicit byte order (server side).
-        def decode(bytes, ctx = nil)
+        # Decode with an explicit byte order (server side). Accepts a byte string
+        # or an IO; when given an IO it reads from it in place, so a caller can
+        # decode a fixed header and then consume the trailing data from the same
+        # buffer (e.g. ChangeProperty/PutImage).
+        def decode(bytes_or_io, ctx = nil)
           require "stringio"
-          from_packet(StringIO.new(bytes.b), ctx)
+          io = bytes_or_io.respond_to?(:read) ? bytes_or_io : StringIO.new(bytes_or_io.b)
+          from_packet(io, ctx)
         end
 
         # FIXME: Doing small reads from socket is a bad idea, and
@@ -128,8 +138,12 @@ module X11
             when :field
               val = if s.type_klass.superclass == BaseForm
                 s.type_klass.from_packet(socket, ctx)
-              else
+              elsif s.type_klass.respond_to?(:size)
                 s.type_klass.unpack( socket.read(s.type_klass.size), ctx )
+              else
+                # variable-length raw field with no fixed size and no length field
+                # (e.g. PutImage's trailing image data) — consume the rest.
+                socket.read
               end
               form.instance_variable_set("@#{s.name}", val)
             when :unused
@@ -550,11 +564,11 @@ module X11
     class ConfigureWindow < BaseForm
       field :opcode, Uint8, value: 12
       unused 1
-      field :request_length, Uint16, value: ->(cw) { 3 + cw.values.length }
+      field :request_length, Uint16, value: ->(cw) { 3 + cw.value_list.length }
       field :window, Window
       field :value_mask, Uint16
       unused 2
-      field :values, Uint32, :list
+      field :value_list, Uint32, :list
     end
 
     class GetGeometry < BaseForm
@@ -603,9 +617,7 @@ module X11
       field :request_length, Uint16, value: ->(ia) {
         2+(ia.name.length+3)/4
       }
-      field :name, Uint16, value: ->(ia) {
-        ia.name.length
-      }
+      field :name, Uint16, :length
       unused 2
       field :name, String8, :string
     end
@@ -953,7 +965,7 @@ module X11
       field :request_length, Uint16, value: ->(qe) { 2+(qe.name.length+3)/4 }
       field :name, Uint16, :length
       unused 2
-      field :name, String8
+      field :name, String8, :string
     end
 
     class QueryExtensionReply < Reply
@@ -1101,6 +1113,66 @@ module X11
       field :opcode, Uint8, value: 119
       unused 1
       field :request_length, Uint16, value: 1
+    end
+
+    # Shared header for PolyPoint(64)/PolyLine(65)/PolySegment(66)/PolyRectangle(67)
+    # and PolyFillRectangle(70): opcode varies, so this is decoded as a header and
+    # the caller reads the trailing LISTofPOINT/SEGMENT/RECTANGLE itself. The
+    # data byte is the coordinate-mode for point/line, unused otherwise.
+    class PolyHeader < BaseForm
+      field :opcode, Uint8
+      field :coordinate_mode, Uint8
+      field :request_length, Uint16, value: 0
+      field :drawable, Drawable
+      field :gc, Gcontext
+    end
+
+    # Server-side header-decode forms for requests with variable trailing data the
+    # client encodes via the full forms above. They decode the fixed head; the
+    # caller reads the trailing image/property/event/rectangle bytes from the same
+    # buffer. No :opcode value, so they stay out of the request registry (the full
+    # form owns the opcode there).
+    class ChangePropertyHeader < BaseForm
+      field :opcode, Uint8, value: 18
+      field :mode, Uint8
+      field :request_length, Uint16, value: 0
+      field :window, Window
+      field :property, Atom
+      field :type, Atom
+      field :format, Uint8
+      unused 3
+      field :data_len, Uint32
+    end
+
+    class PutImageHeader < BaseForm
+      field :opcode, Uint8, value: 72
+      field :format, Uint8
+      field :request_length, Uint16, value: 0
+      field :drawable, Drawable
+      field :gc, Gcontext
+      field :width, Uint16
+      field :height, Uint16
+      field :dst_x, Int16
+      field :dst_y, Int16
+      field :left_pad, Uint8
+      field :depth, Uint8
+      unused 2
+    end
+
+    class SendEventHeader < BaseForm
+      field :opcode, Uint8, value: 25
+      field :propagate, Bool
+      field :request_length, Uint16, value: 0
+      field :destination, Window
+      field :event_mask, Uint32
+    end
+
+    class PolyFillRectangleHeader < BaseForm
+      field :opcode, Uint8, value: 70
+      unused 1
+      field :request_length, Uint16, value: 0
+      field :drawable, Drawable
+      field :gc, Gcontext
     end
 
     # Events (page ~157)

@@ -85,7 +85,8 @@ module X11
     end
       
     class Bool
-      def self.pack(x, ctx = nil) = (x ? "\x01" : "\x00")
+      # Accept true/false (client) or 0/1 (server) — note 0 is truthy in Ruby.
+      def self.pack(x, ctx = nil) = (x && x != 0 ? "\x01" : "\x00")
       def self.unpack(str, ctx = nil)  = (str[0] == "\x01")
       def self.size = 1
       def self.from_packet(sock, ctx = nil) = unpack(sock.read(size), ctx)
