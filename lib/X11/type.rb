@@ -9,22 +9,34 @@ module X11
       @directive = nil
       @bytesize = nil
 
-      def self.config(d,b) = (@directive, @bytesize = d,b)
-        
-      def self.pack(x, dpy)
+      # `ctx` is nil/Display (client → native order) or an X11::Context (server →
+      # explicit order). Multi-byte directives gain "<"/">" only for a Context, so
+      # the client path stays byte-identical.
+      def self.config(d,b)
+        @directive, @bytesize = d, b
+        @dir_lsb = b > 1 ? "#{d}<" : d
+        @dir_msb = b > 1 ? "#{d}>" : d
+      end
+
+      def self.directive(ctx = nil)
+        return @directive unless ctx.is_a?(X11::Context)
+        ctx.msb? ? @dir_msb : @dir_lsb
+      end
+
+      def self.pack(x, ctx = nil)
         if x.is_a?(Symbol)
           if (t = X11::Form.const_get(x)) && t.is_a?(Numeric)
             x = t
           end
         end
-        [x].pack(@directive)
+        [x].pack(directive(ctx))
       rescue TypeError
         raise "Expected #{self.name}, got #{x.class} (value: #{x})"
       end
 
-      def self.unpack(x) = x.nil? ? nil  : x.unpack1(@directive)
+      def self.unpack(x, ctx = nil) = x.nil? ? nil : x.unpack1(directive(ctx))
       def self.size = @bytesize
-      def self.from_packet(sock) = unpack(sock.read(size))
+      def self.from_packet(sock, ctx = nil) = unpack(sock.read(size), ctx)
     end
     
     class Int8   < BaseType; config("c",1); end
@@ -35,10 +47,10 @@ module X11
     class Uint32 < BaseType; config("L",4); end
     
     class Message
-      def self.pack(x,dpy) = x.b
-      def self.unpack(x)   = x.b
+      def self.pack(x, ctx = nil) = x.b
+      def self.unpack(x, ctx = nil)   = x.b
       def self.size        = 20
-      def self.from_packet(sock) = sock.read(2).b
+      def self.from_packet(sock, ctx = nil) = sock.read(2).b
     end
 
     class String8
@@ -73,9 +85,10 @@ module X11
     end
       
     class Bool
-      def self.pack(x, dpy) = (x ? "\x01" : "\x00")
-      def self.unpack(str)  = (str[0] == "\x01")
+      def self.pack(x, ctx = nil) = (x ? "\x01" : "\x00")
+      def self.unpack(str, ctx = nil)  = (str[0] == "\x01")
       def self.size = 1
+      def self.from_packet(sock, ctx = nil) = unpack(sock.read(size), ctx)
     end
     
     KeyCode      = Uint8
@@ -99,10 +112,21 @@ module X11
     Keysym       = Uint32
 
     class Atom
-      def self.pack(x,dpy) = [dpy.atom(x)].pack("L")
-      def self.unpack(x)   = x.nil? ? nil : x.unpack1("L")
+      # Client: ctx is a Display, value is a name/symbol to intern (exact legacy
+      # behaviour). Server: ctx is an X11::Context, value is already a numeric id.
+      def self.pack(x, ctx = nil)
+        if ctx.is_a?(X11::Context)
+          [x].pack(ctx.msb? ? "L>" : "L<")
+        else
+          [ctx.atom(x)].pack("L")
+        end
+      end
+      def self.unpack(x, ctx = nil)
+        return nil if x.nil?
+        x.unpack1(ctx.is_a?(X11::Context) ? (ctx.msb? ? "L>" : "L<") : "L")
+      end
       def self.size = 4
-      def self.from_packet(sock) = unpack(sock.read(size))
+      def self.from_packet(sock, ctx = nil) = unpack(sock.read(size), ctx)
     end
   end
 end

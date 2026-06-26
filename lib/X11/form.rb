@@ -33,16 +33,26 @@ module X11
     class BaseForm < Form
       include X11::Type
 
-      # initialize field accessors
-      def initialize(*params)
-        self.class.fields.each do |f|
-          if !f.value
-            param = params.shift
-            #p [f,param]
-            instance_variable_set("@#{f.name}", param)
+      # initialize field accessors. Positional (legacy client) or by keyword (the
+      # server constructs replies/events by field name).
+      def initialize(*params, **kwargs)
+        if kwargs.empty?
+          self.class.fields.each do |f|
+            if !f.value
+              param = params.shift
+              #p [f,param]
+              instance_variable_set("@#{f.name}", param)
+            end
           end
+        else
+          kwargs.each { |k, v| instance_variable_set("@#{k}", v) }
         end
       end
+
+      # Byte-order-aware encode shared by server + client. `ctx` is an X11::Context
+      # (explicit order) for the server or a Display (native) for the client;
+      # to_packet just threads it to the types, which branch on its class.
+      def encode(ctx) = to_packet(ctx)
 
       def to_packet(dpy)
         # fetch class level instance variable holding defined fields
@@ -97,9 +107,17 @@ module X11
           superclass.structs + Array(@structs) #instance_variable_get("@structs"))
         end
 
+        # Decode from a byte buffer with an explicit byte order (server side).
+        def decode(bytes, ctx = nil)
+          require "stringio"
+          from_packet(StringIO.new(bytes.b), ctx)
+        end
+
         # FIXME: Doing small reads from socket is a bad idea, and
         # the protocol provides length fields that makes it unnecessary.
-        def from_packet(socket)
+        # `ctx` is nil/Display for the native client or an X11::Context for the
+        # server; it's threaded to the scalar types (strings are order-agnostic).
+        def from_packet(socket, ctx = nil)
           # fetch class level instance variable holding defined fields
 
           form = new
@@ -109,19 +127,19 @@ module X11
             case s.type
             when :field
               val = if s.type_klass.superclass == BaseForm
-                s.type_klass.from_packet(socket)
+                s.type_klass.from_packet(socket, ctx)
               else
-                s.type_klass.unpack( socket.read(s.type_klass.size) )
+                s.type_klass.unpack( socket.read(s.type_klass.size), ctx )
               end
               form.instance_variable_set("@#{s.name}", val)
             when :unused
               sz = s.size.respond_to?(:call) ? s.size.call(self) : s.size
               socket.read(sz)
             when :length
-              size = s.type_klass.unpack( socket.read(s.type_klass.size) )
+              size = s.type_klass.unpack( socket.read(s.type_klass.size), ctx )
               lengths[s.name] = size
             when :format_length
-              size = s.type_klass.unpack( socket.read(s.type_klass.size) )
+              size = s.type_klass.unpack( socket.read(s.type_klass.size), ctx )
               lengths[s.name] = case form.format
                                 when 8 then size
                                 when 16 then size*2
@@ -136,11 +154,11 @@ module X11
               len = lengths[s.name]
               if len
                 val = len.times.collect do
-                  s.type_klass.from_packet(socket)
+                  s.type_klass.from_packet(socket, ctx)
                 end
               else
                 val = []
-                while ob = s.type_klass.from_packet(socket)
+                while ob = s.type_klass.from_packet(socket, ctx)
                   val << ob
                 end
               end
@@ -964,6 +982,125 @@ module X11
       field :reply_length, Uint32
       unused 24
       field :keysyms, Keysym, :list
+    end
+
+    # --- Requests folded back from the X12 server (it decodes these). Plain
+    # fixed-layout requests the client side had not yet needed. ---
+
+    class MapSubwindows < BaseForm
+      field :opcode, Uint8, value: 9
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class DeleteProperty < BaseForm
+      field :opcode, Uint8, value: 19
+      unused 1
+      field :request_length, Uint16, value: 3
+      field :window, Window
+      field :property, Atom
+    end
+
+    class ListProperties < BaseForm
+      field :opcode, Uint8, value: 21
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :window, Window
+    end
+
+    class ConvertSelection < BaseForm
+      field :opcode, Uint8, value: 24
+      unused 1
+      field :request_length, Uint16, value: 6
+      field :requestor, Window
+      field :selection, Atom
+      field :target, Atom
+      field :property, Atom
+      field :time, Timestamp
+    end
+
+    class UngrabKey < BaseForm
+      field :opcode, Uint8, value: 34
+      field :key, Uint8
+      field :request_length, Uint16, value: 3
+      field :grab_window, Window
+      field :modifiers, Uint16
+      unused 2
+    end
+
+    class TranslateCoordinates < BaseForm
+      field :opcode, Uint8, value: 40
+      unused 1
+      field :request_length, Uint16, value: 4
+      field :src_window, Window
+      field :dst_window, Window
+      field :src_x, Int16
+      field :src_y, Int16
+    end
+
+    class SetInputFocus < BaseForm
+      field :opcode, Uint8, value: 42
+      field :revert_to, Uint8
+      field :request_length, Uint16, value: 3
+      field :focus, Window
+      field :time, Timestamp
+    end
+
+    class FreeGC < BaseForm
+      field :opcode, Uint8, value: 60
+      unused 1
+      field :request_length, Uint16, value: 2
+      field :gc, Gcontext
+    end
+
+    class CopyPlane < BaseForm
+      field :opcode, Uint8, value: 63
+      unused 1
+      field :request_length, Uint16, value: 8
+      field :src_drawable, Drawable
+      field :dst_drawable, Drawable
+      field :gc, Gcontext
+      field :src_x, Int16
+      field :src_y, Int16
+      field :dst_x, Int16
+      field :dst_y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :bit_plane, Uint32
+    end
+
+    class GetImage < BaseForm
+      field :opcode, Uint8, value: 73
+      field :format, Uint8
+      field :request_length, Uint16, value: 5
+      field :drawable, Drawable
+      field :x, Int16
+      field :y, Int16
+      field :width, Uint16
+      field :height, Uint16
+      field :plane_mask, Uint32
+    end
+
+    class QueryBestSize < BaseForm
+      field :opcode, Uint8, value: 97
+      field :klass, Uint8
+      field :request_length, Uint16, value: 3
+      field :drawable, Drawable
+      field :width, Uint16
+      field :height, Uint16
+    end
+
+    class ListExtensions < BaseForm
+      field :opcode, Uint8, value: 99
+      unused 1
+      field :request_length, Uint16, value: 1
+    end
+
+    class GetModifierMapping < BaseForm
+      field :opcode, Uint8, value: 119
+      unused 1
+      field :request_length, Uint16, value: 1
     end
 
     # Events (page ~157)
