@@ -151,12 +151,17 @@ module X11
 
     def read_full_packet(len = 32)
       data = @socket.read(32)
-      return nil if data.nil?
+      return nil if data.nil? # EOF — the server went away
       while data.length < 32
         IO.select([@socket],nil,nil,0.001)
-        data.concat(@socket.read_nonblock(32 - data.length))
+        chunk = @socket.read_nonblock(32 - data.length, exception: false)
+        return nil if chunk.nil?            # EOF mid-packet
+        next     if chunk == :wait_readable # no data yet
+        data.concat(chunk)
       end
       return data
+    rescue EOFError, IOError, Errno::ECONNRESET, Errno::EBADF
+      nil # connection lost — signal the read loop to stop (was: raise -> orphan)
     end
 
     def read_packet
@@ -254,6 +259,12 @@ module X11
           @requestseq = (@requestseq + 1) % 65536
           @socket.write(data)
         end
+      rescue IOError, Errno::EPIPE, Errno::ECONNRESET, Errno::EBADF
+        # Server went away while we were writing. Close the read queue so
+        # consumers blocked in next_packet get nil and can exit cleanly, instead
+        # of this thread dying silently and leaving the app spinning/orphaned.
+        @rqueue.close
+        @replies.values.each { |q| q.close rescue nil }
       end
 
       at_exit do
