@@ -1583,5 +1583,120 @@ module X11
        unused 20
        field :screens, XineramaScreenInfo, :list
      end
+
+    # Server reply forms folded back from X12: fixed replies the client had not
+    # needed, plus variable-tail reply *headers* (the reply analogue of the
+    # request *Header forms) — the server encodes the 32-byte header then appends
+    # the list/string/image data itself.
+    class TranslateCoordinatesReply < BaseForm
+      field :reply, Uint8, value: 1
+      field :same_screen, Uint8, value: 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32, value: 0
+      field :child, Window
+      field :dst_x, Int16
+      field :dst_y, Int16
+      unused 16
+    end
+
+    class QueryBestSizeReply < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32, value: 0
+      field :width, Uint16
+      field :height, Uint16
+      unused 20
+    end
+
+    class QueryTreeReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :root, Window
+      field :parent, Window
+      field :num_children, Uint16
+      unused 14
+    end
+
+    class GetAtomNameReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :name_len, Uint16
+      unused 22
+    end
+
+    class GetPropertyReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :format, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :type_atom, Atom
+      field :bytes_after, Uint32
+      field :value_len, Uint32
+      unused 12
+    end
+
+    class ListPropertiesReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :num_atoms, Uint16
+      unused 22
+    end
+
+    class GetImageReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :depth, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :visual, VisualID
+      unused 20
+    end
+
+    class XineramaQueryScreensReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      unused 1
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      field :number, Uint32
+      unused 20
+    end
+
+    class GetKeyboardMappingReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :keysyms_per_keycode, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      unused 24
+    end
+
+    class GetPointerMappingReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :map_length, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      unused 24
+    end
+
+    class GetModifierMappingReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :keycodes_per_modifier, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      unused 24
+    end
+
+    class ListExtensionsReplyHeader < BaseForm
+      field :reply, Uint8, value: 1
+      field :num_names, Uint8
+      field :sequence_number, Uint16
+      field :reply_length, Uint32
+      unused 24
+    end
   end
 end
