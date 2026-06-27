@@ -248,7 +248,7 @@ module X11
     ##
 
     class Reply < BaseForm
-      field :reply, Uint8
+      field :reply, Uint8, value: 1
     end
 
     class ClientHandshake < BaseForm
@@ -338,7 +338,7 @@ module X11
     end
 
     class Error < BaseForm
-      field :error, Uint8
+      field :error, Uint8, value: 0 # error packets start with 0 (server encode)
       field :code,  Uint8
       field :sequence_number, Uint16
       field :bad_resource_id, Uint32
@@ -470,7 +470,7 @@ module X11
       field :reply, Uint8, value: 1
       field :backing_store, Uint8
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 3
       field :visual, VisualID
       field :wclass, Uint16
       field :bit_gravity, Uint8
@@ -505,7 +505,7 @@ module X11
     class QueryPointerReply < Reply
       field :same_screen, Bool
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :root, Window
       field :child, Window
       field :root_x, Int16
@@ -525,7 +525,7 @@ module X11
     class GetInputFocusReply < Reply
       field :revert_to, Uint8
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :focus, Window
       unused 20
     end
@@ -582,7 +582,7 @@ module X11
       field :reply, Uint8, value: 1
       field :depth, Uint8
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :root, Window
       field :x, Int16
       field :y, Int16
@@ -625,7 +625,7 @@ module X11
     class InternAtomReply < Reply
       unused 1
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :atom, Atom
       unused 20
     end
@@ -721,7 +721,7 @@ module X11
     class SelectionOwner < Reply
       unused 1
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :owner, Window
       unused 20
     end
@@ -765,9 +765,9 @@ module X11
     end
 
     class GrabKeyboardReply < Reply
-      field :status, Uint8
+      field :status, Uint8, value: 0
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       unused 24
     end
 
@@ -971,7 +971,7 @@ module X11
     class QueryExtensionReply < Reply
       unused 1
       field :sequence_number, Uint16
-      field :reply_length, Uint32
+      field :reply_length, Uint32, value: 0
       field :present, Bool
       field :major_opcode, Uint8
       field :first_event, Uint8
@@ -1391,7 +1391,7 @@ module X11
     class XRenderQueryVersionReply < Reply
       unused 1
       field :sequence_number, Uint16
-      field :request_length, Uint32
+      field :request_length, Uint32, value: 0
       field :major_version, Uint32
       field :minor_version, Uint32
       #unused 16
@@ -1542,7 +1542,7 @@ module X11
      class XineramaQueryVersionReply < Reply
        unused 1
        field :sequence_number, Uint16
-       field :reply_length, Uint32
+       field :reply_length, Uint32, value: 0
        field :major_version, Uint16
        field :minor_version, Uint16
        unused 20
@@ -1557,7 +1557,7 @@ module X11
      class XineramaIsActiveReply < Reply
        unused 1
        field :sequence_number, Uint16
-       field :reply_length, Uint32
+       field :reply_length, Uint32, value: 0
        field :state, Uint32
        unused 20
      end
