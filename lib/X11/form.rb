@@ -1292,6 +1292,18 @@ module X11
       unused 14
     end
 
+    class SelectionNotify < BaseForm # 31
+      field :code, Uint8, value: 31
+      unused 1
+      field :sequence_number, Uint16
+      field :time, Timestamp
+      field :requestor, Window
+      field :selection, Atom
+      field :target, Atom
+      field :property, Atom
+      unused 8
+    end
+
     class NoExposure < SimpleEvent # 14
       field :drawable, Drawable
       field :minor_opcode, Uint16
